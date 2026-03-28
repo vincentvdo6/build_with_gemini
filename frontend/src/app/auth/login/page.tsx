@@ -15,21 +15,21 @@ function BackgroundBlobs() {
       <div
         className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full opacity-20"
         style={{
-          background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)",
+          background: "radial-gradient(circle, #2563eb 0%, transparent 70%)",
           filter: "blur(80px)",
         }}
       />
       <div
         className="absolute -bottom-40 -right-20 h-[500px] w-[500px] rounded-full opacity-15"
         style={{
-          background: "radial-gradient(circle, #4f46e5 0%, transparent 70%)",
+          background: "radial-gradient(circle, #1d4ed8 0%, transparent 70%)",
           filter: "blur(100px)",
         }}
       />
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[300px] w-[300px] rounded-full opacity-10"
         style={{
-          background: "radial-gradient(circle, #8b5cf6 0%, transparent 70%)",
+          background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)",
           filter: "blur(60px)",
         }}
       />
@@ -42,7 +42,7 @@ function BackgroundBlobs() {
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5 group">
-      <div className="relative h-9 w-9 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-900/50 group-hover:bg-violet-500 transition-colors">
+      <div className="relative h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/50 group-hover:bg-blue-500 transition-colors">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <path d="M10 2L3 7v6l7 5 7-5V7l-7-5z" fill="white" fillOpacity="0.9" />
           <path d="M10 2L3 7l7 5 7-5-7-5z" fill="white" fillOpacity="0.4" />
@@ -77,7 +77,6 @@ function TrustBadges() {
 function StepBreadcrumb() {
   const steps = [
     { label: "Sign up", href: "/auth/signup", done: true },
-    { label: "Verify email", href: null, done: true },
     { label: "Sign in", href: null, active: true },
     { label: "Profile setup", href: null, done: false },
   ];
@@ -90,7 +89,7 @@ function StepBreadcrumb() {
             <div
               className={[
                 "h-px w-5 transition-colors",
-                step.done ? "bg-violet-400/60" : "bg-white/10",
+                step.done ? "bg-blue-400/60" : "bg-white/10",
               ].join(" ")}
             />
           )}
@@ -98,9 +97,9 @@ function StepBreadcrumb() {
             className={[
               "text-[11px] font-medium px-2 py-0.5 rounded-full transition-colors",
               step.active
-                ? "bg-violet-600/40 text-violet-300 ring-1 ring-violet-400/40"
+                ? "bg-blue-600/40 text-blue-300 ring-1 ring-blue-400/40"
                 : step.done
-                ? "text-violet-400/70"
+                ? "text-blue-400/70"
                 : "text-white/20",
             ].join(" ")}
           >
@@ -124,15 +123,6 @@ export default function LoginPage() {
         {/* Top nav strip */}
         <header className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-5">
           <Logo />
-          <p className="text-sm text-white/40">
-            New here?{" "}
-            <Link
-              href="/auth/signup"
-              className="text-violet-400 font-medium hover:text-violet-300 transition-colors"
-            >
-              Create account
-            </Link>
-          </p>
         </header>
 
         {/* Card */}

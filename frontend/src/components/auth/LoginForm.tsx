@@ -105,7 +105,7 @@ export function LoginForm() {
           </label>
           <Link
             href="/auth/forgot-password"
-            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
           >
             Forgot password?
           </Link>
@@ -130,11 +130,11 @@ export function LoginForm() {
         disabled={loading}
         className={[
           "flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3",
-          "bg-violet-600 text-sm font-semibold text-white",
-          "transition-all duration-200 hover:bg-violet-500 active:scale-[0.98]",
-          "focus:outline-none focus:ring-2 focus:ring-violet-400/50 focus:ring-offset-2 focus:ring-offset-transparent",
-          "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-violet-600",
-          "shadow-lg shadow-violet-900/40",
+          "bg-blue-600 text-sm font-semibold text-white",
+          "transition-all duration-200 hover:bg-blue-500 active:scale-[0.98]",
+          "focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-2 focus:ring-offset-transparent",
+          "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-blue-600",
+          "shadow-lg shadow-blue-900/40",
         ].join(" ")}
       >
         {loading ? (<><Spinner /> Signing in…</>) : "Sign in"}
@@ -142,7 +142,7 @@ export function LoginForm() {
 
       <p className="text-center text-sm text-white/40">
         Don&apos;t have an account?{" "}
-        <Link href="/auth/signup" className="text-violet-400 font-medium hover:text-violet-300 transition-colors">
+        <Link href="/auth/signup" className="text-blue-400 font-medium hover:text-blue-300 transition-colors">
           Create one
         </Link>
       </p>
