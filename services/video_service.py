@@ -64,17 +64,33 @@ def generate_video(
                     "Video generation did not complete."
                 )
 
-        # Phase 3: Download
+        # Phase 3: Download (streaming to handle large files)
+        if not operation.response or not operation.response.generated_videos:
+            raise RuntimeError(
+                f"Veo completed but returned no videos. "
+                f"Response: {operation.response}"
+            )
         video_uri = operation.response.generated_videos[0].video.uri
-        print(f"[Veo] Video ready. Downloading...")
+        print(f"[Veo] Video ready. Downloading from: {video_uri[:80]}...")
 
         dl_response = requests.get(
             video_uri,
             headers={"x-goog-api-key": GEMINI_API_KEY},
-            timeout=60,
+            timeout=(15, 120),  # 15s connect, 120s read
+            stream=True,
         )
         dl_response.raise_for_status()
-        video_data = dl_response.content
+
+        chunks = []
+        downloaded = 0
+        for chunk in dl_response.iter_content(chunk_size=256 * 1024):
+            if chunk:
+                chunks.append(chunk)
+                downloaded += len(chunk)
+                if downloaded % (1024 * 1024) < 256 * 1024:  # log ~every 1MB
+                    print(f"[Veo] Downloaded {downloaded / (1024*1024):.1f} MB...")
+        video_data = b"".join(chunks)
+        print(f"[Veo] Download complete: {len(video_data) / (1024*1024):.1f} MB")
 
         if len(video_data) < 1000:
             raise RuntimeError(

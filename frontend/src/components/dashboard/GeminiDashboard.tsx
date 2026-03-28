@@ -190,14 +190,111 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
   const [query, setQuery] = useState("");
   const [campaigns, setCampaigns] = useState(ALL_CAMPAIGNS);
   const [showNewCampaign, setShowNewCampaign] = useState(false);
-  const [pendingCampaign, setPendingCampaign] = useState<{ businessName: string; productName: string } | null>(null);
-  const [editorCampaign, setEditorCampaign] = useState<string | null>(null);
+  const [pendingCampaign, setPendingCampaign] = useState<{
+    businessName: string;
+    productName: string;
+    artDirections: any[];
+    vibeImages: string[];
+    campaignId: string;
+    files: File[];
+    logo: File | null;
+    imageCount: number;
+  } | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeStatus, setAnalyzeStatus] = useState("");
+  const [editorCampaign, setEditorCampaign] = useState<{
+    campaignId: string;
+    campaignName: string;
+    files: File[];
+    logo: File | null;
+    directionIndex: number;
+    artDirections: any[];
+    imageCount: number;
+  } | null>(null);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+  async function handleNewCampaign({ businessName, productName, files, logo, imageCount }: {
+    businessName: string; productName: string; files: File[]; logo: File | null; imageCount: number;
+  }) {
+    setShowNewCampaign(false);
+    setAnalyzing(true);
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      // Step 1: Create campaign
+      setAnalyzeStatus("Creating campaign...");
+      const createRes = await fetch(`${API_URL}/api/campaigns`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ businessName, productName }),
+      });
+      const campaign = await createRes.json();
+      const campaignId = campaign.id;
+
+      // Step 2: Analyze product
+      setAnalyzeStatus("Analyzing your product...");
+      const analyzeForm = new FormData();
+      for (const f of files) analyzeForm.append("product_photos", f);
+      if (logo) analyzeForm.append("logo", logo);
+
+      const analyzeRes = await fetch(`${API_URL}/api/campaigns/${campaignId}/analyze`, {
+        method: "POST",
+        headers,
+        body: analyzeForm,
+      });
+      const analysis = await analyzeRes.json();
+
+      // Step 3: Generate 3 scene preview images (sends photos for context)
+      setAnalyzeStatus("Generating art directions...");
+      const vibesForm = new FormData();
+      for (const f of files) vibesForm.append("product_photos", f);
+      if (logo) vibesForm.append("logo", logo);
+
+      const vibesRes = await fetch(`${API_URL}/api/campaigns/${campaignId}/vibes`, {
+        method: "POST",
+        headers,
+        body: vibesForm,
+      });
+      const vibesData = await vibesRes.json();
+      const vibeImages = vibesData.vibes.map((v: any) => `data:image/png;base64,${v.image}`);
+
+      // Show concept direction screen
+      setPendingCampaign({
+        businessName,
+        productName,
+        artDirections: analysis.art_directions,
+        vibeImages,
+        campaignId,
+        files,
+        logo,
+        imageCount,
+      });
+
+    } catch (err: any) {
+      console.error("Campaign creation failed:", err);
+      setAnalyzeStatus(`Error: ${err.message}`);
+      await new Promise((r) => setTimeout(r, 3000));
+    } finally {
+      setAnalyzing(false);
+      setAnalyzeStatus("");
+    }
+  }
 
   // If an editor is open, render it full-screen instead of the dashboard
   if (editorCampaign !== null) {
     return (
       <CampaignEditor
-        campaignName={editorCampaign}
+        campaignId={editorCampaign.campaignId}
+        campaignName={editorCampaign.campaignName}
+        files={editorCampaign.files}
+        logo={editorCampaign.logo}
+        directionIndex={editorCampaign.directionIndex}
+        artDirections={editorCampaign.artDirections}
+        imageCount={editorCampaign.imageCount}
         onBack={() => setEditorCampaign(null)}
       />
     );
@@ -297,7 +394,15 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
               <CampaignCard
                 key={c.id}
                 campaign={c}
-                onCardClick={(name) => setEditorCampaign(name)}
+                onCardClick={(name) => setEditorCampaign({
+                  campaignId: c.id,
+                  campaignName: name,
+                  files: [],
+                  logo: null,
+                  directionIndex: 0,
+                  artDirections: [],
+                  imageCount: 3,
+                })}
                 onDelete={(id) => setCampaigns((prev) => prev.filter((x) => x.id !== id))}
                 onRename={(id, name) => setCampaigns((prev) => prev.map((x) => x.id === id ? { ...x, name } : x))}
               />
@@ -312,11 +417,16 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
       {showNewCampaign && (
         <NewCampaignModal
           onClose={() => setShowNewCampaign(false)}
-          onGenerate={({ businessName, productName }) => {
-            setShowNewCampaign(false);
-            setPendingCampaign({ businessName, productName });
-          }}
+          onGenerate={handleNewCampaign}
         />
+      )}
+
+      {/* Analyzing overlay */}
+      {analyzing && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm gap-4">
+          <div className="w-10 h-10 border-2 border-white/20 border-t-blue-400 rounded-full animate-spin" />
+          <p className="text-sm text-white/70">{analyzeStatus}</p>
+        </div>
       )}
 
       {/* Concept Direction Screen */}
@@ -324,8 +434,21 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
         <ConceptDirectionScreen
           businessName={pendingCampaign.businessName}
           productName={pendingCampaign.productName}
+          artDirections={pendingCampaign.artDirections}
+          vibeImages={pendingCampaign.vibeImages}
           onBack={() => { setPendingCampaign(null); setShowNewCampaign(true); }}
-          onGenerate={() => { setEditorCampaign(pendingCampaign.businessName || "New Campaign"); setPendingCampaign(null); }}
+          onGenerate={(directionIndex: number) => {
+            setEditorCampaign({
+              campaignId: pendingCampaign.campaignId,
+              campaignName: pendingCampaign.businessName || "New Campaign",
+              files: pendingCampaign.files,
+              logo: pendingCampaign.logo,
+              directionIndex,
+              artDirections: pendingCampaign.artDirections,
+              imageCount: pendingCampaign.imageCount,
+            });
+            setPendingCampaign(null);
+          }}
         />
       )}
     </div>

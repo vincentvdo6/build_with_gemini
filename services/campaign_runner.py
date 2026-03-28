@@ -56,63 +56,69 @@ def run_campaign(
     print(f"\n  → Using art direction: '{chosen.get('name', 'Direction 1')}'")
     print(f"  {rate_limiter.status()}\n")
 
-    # Step 2: Generate 5 campaign images for the chosen art direction
-    print(f"Step 2/5: Generating 5 images for '{chosen.get('name', 'Direction 1')}'...")
-    assets["images"] = []
+    # Step 2-4: Generate images + video + jingle IN PARALLEL
+    import concurrent.futures
 
-    for img_num in range(1, 6):
-        print(f"  Generating image {img_num}/5...")
+    veo_prompt = chosen.get("prompt_fragments", {}).get("veo", "")
+    if not veo_prompt:
+        veo_prompt = chosen.get("visual_treatment", "Product advertisement, cinematic, 8 seconds")
+
+    lyria_prompt = chosen.get("prompt_fragments", {}).get("lyria", "")
+    if not lyria_prompt:
+        lyria_prompt = "Upbeat advertising jingle, 100 BPM, modern and energetic"
+
+    print(f"\nStep 2/3: Generating 3 images + video + jingle in parallel...")
+    print(f"  Veo prompt: {veo_prompt[:120]}...")
+    print(f"  Lyria prompt: {lyria_prompt[:120]}...")
+
+    image_count = 3
+
+    def _gen_image(img_num: int) -> str:
+        print(f"  [Image {img_num}/{image_count}] Generating...")
         img_bytes = apply_art_direction(
             isolated_product=product_photos[0],
             art_direction=chosen,
             reference_images=product_photos,
             logo=logo,
+            series_index=img_num,
+            series_total=image_count,
         )
         img_path = os.path.join(out_dir, f"image_{img_num}.png")
         Path(img_path).write_bytes(img_bytes)
-        print(f"    Saved: {img_path} ({len(img_bytes) / 1024:.0f} KB)")
-        print(f"    {rate_limiter.status()}")
-        assets["images"].append(img_path)
+        print(f"  [Image {img_num}/{image_count}] Done ({len(img_bytes) / 1024:.0f} KB) {rate_limiter.status()}")
+        return img_path
 
-    # Step 3: Generate video
-    print("Step 3/5: Generating video (this takes ~60s)...")
-    veo_prompt = chosen.get("prompt_fragments", {}).get("veo", "")
-    if not veo_prompt:
-        print("  WARNING: No veo prompt fragment, using visual treatment as fallback")
-        veo_prompt = chosen.get("visual_treatment", "Product advertisement, cinematic, 8 seconds")
+    def _gen_video() -> str:
+        print(f"  [Video] Generating...")
+        result = generate_video(veo_prompt, reference_images=product_photos[:3])
+        path = os.path.join(out_dir, "video.mp4")
+        Path(path).write_bytes(result["video_data"])
+        print(f"  [Video] Done ({len(result['video_data']) / (1024*1024):.1f} MB)")
+        return path
 
-    # Send up to 3 reference photos so Veo maintains product consistency
-    veo_refs = product_photos[:3]
-    print(f"  Sending {len(veo_refs)} reference photo(s) to Veo")
-    print(f"  Veo prompt: {veo_prompt[:150]}...")
+    def _gen_jingle() -> str:
+        print(f"  [Jingle] Generating...")
+        result = generate_jingle(lyria_prompt)
+        path = os.path.join(out_dir, "jingle.wav")
+        Path(path).write_bytes(result["audio_data"])
+        print(f"  [Jingle] Done ({len(result['audio_data']) / (1024*1024):.1f} MB)")
+        return path
 
-    video_result = generate_video(veo_prompt, reference_images=veo_refs)
-    video_path = os.path.join(out_dir, "video.mp4")
-    Path(video_path).write_bytes(video_result["video_data"])
-    print(f"  Saved: {video_path} ({len(video_result['video_data']) / (1024*1024):.1f} MB)")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        img_futures = [pool.submit(_gen_image, i) for i in range(1, image_count + 1)]
+        video_future = pool.submit(_gen_video)
+        jingle_future = pool.submit(_gen_jingle)
+
+        assets["images"] = [f.result() for f in img_futures]
+        assets["video"] = video_future.result()
+        assets["jingle"] = jingle_future.result()
+
     print(f"  {rate_limiter.status()}\n")
-    assets["video"] = video_path
 
-    # Step 4: Generate jingle
-    print("Step 4/5: Generating jingle...")
-    lyria_prompt = chosen.get("prompt_fragments", {}).get("lyria", "")
-    if not lyria_prompt:
-        print("  WARNING: No lyria prompt fragment, using default")
-        lyria_prompt = "Upbeat advertising jingle, 100 BPM, modern and energetic"
-
-    jingle_result = generate_jingle(lyria_prompt)
-    jingle_path = os.path.join(out_dir, "jingle.wav")
-    Path(jingle_path).write_bytes(jingle_result["audio_data"])
-    print(f"  Saved: {jingle_path} ({len(jingle_result['audio_data']) / (1024*1024):.1f} MB)")
-    if jingle_result["text_parts"]:
-        print(f"  Lyria notes: {jingle_result['text_parts'][0][:100]}...")
-    print(f"  {rate_limiter.status()}\n")
-    assets["jingle"] = jingle_path
-
-    # Step 5: Merge video + jingle
-    print("Step 5/5: Merging video + jingle with ffmpeg...")
+    # Step 3: Merge video + jingle (must wait for both)
+    print("Step 3/3: Merging video + jingle with ffmpeg...")
     final_path = os.path.join(out_dir, "final_ad.mp4")
-    merge_audio_video(video_path, jingle_path, final_path)
+    merge_audio_video(assets["video"], assets["jingle"], final_path)
     final_size = os.path.getsize(final_path) / (1024 * 1024)
     print(f"  Saved: {final_path} ({final_size:.1f} MB)\n")
     assets["final_ad"] = final_path

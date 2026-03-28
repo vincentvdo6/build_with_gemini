@@ -1,15 +1,23 @@
-from fastapi import Depends, HTTPException, Request
-from firebase_admin import auth
+import os
+from fastapi import HTTPException, Request
+
+DEV_MODE = os.getenv("DEV_MODE", "true").lower() == "true"
+
+DEV_USER = {"uid": "dev-user", "email": "dev@localhost"}
 
 
 def get_current_user(request: Request) -> dict:
     """Extract and verify the Firebase ID token from the Authorization header.
 
-    Returns a dict with uid, email, etc.
+    In dev mode, skips verification and returns a stub user.
     """
+    if DEV_MODE:
+        return DEV_USER
+
+    from firebase_admin import auth
+
     header = request.headers.get("Authorization", "")
     if not header.startswith("Bearer "):
-        # Also check query param (used by SSE EventSource which can't set headers)
         token = request.query_params.get("token")
         if not token:
             raise HTTPException(status_code=401, detail="Missing auth token")

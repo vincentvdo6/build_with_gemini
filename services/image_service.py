@@ -25,6 +25,8 @@ def apply_art_direction(
     art_direction: dict,
     reference_images: list[bytes],
     logo: bytes | None = None,
+    series_index: int = 0,
+    series_total: int = 0,
 ) -> bytes:
     """Generate a preview image of the product placed into an art direction's scene.
 
@@ -39,6 +41,8 @@ def apply_art_direction(
         reference_images: Original multi-angle product photos so the model
             knows what the product looks like from every angle.
         logo: Optional brand logo bytes.
+        series_index: If generating a series, which image this is (1-based).
+        series_total: Total images in the series (0 = standalone).
 
     Returns:
         PNG image bytes of the product placed in the scene.
@@ -63,6 +67,20 @@ def apply_art_direction(
         contents.append(types.Part(text="[BRAND LOGO — incorporate naturally if appropriate]:"))
         contents.append(types.Part.from_bytes(data=logo, mime_type="image/png"))
 
+    # Build thematic continuity instruction for series
+    series_instruction = ""
+    if series_total > 1 and series_index > 0:
+        moment_hints = [
+            "a wide establishing shot showing the full scene",
+            "a close-up detail shot focusing on the product's texture and label",
+            "an atmospheric mood shot with dramatic lighting",
+            "a lifestyle context shot showing the product in use",
+            "an artistic angle with creative composition",
+        ]
+        hint = moment_hints[(series_index - 1) % len(moment_hints)]
+        series_instruction = f"""
+SERIES CONTINUITY: This is image {series_index} of {series_total} in a campaign series. All images share the same color palette, lighting style, and overall mood — but each shows a DIFFERENT moment or angle. For this image, create {hint}. Vary the camera angle and composition from the other shots while keeping the visual identity cohesive."""
+
     # Build the generation prompt
     prompt = f"""Generate a single advertising photograph using the EXACT product shown in the reference photos above. Do NOT invent or hallucinate a different product — use the real one.
 
@@ -72,10 +90,15 @@ Color palette: {', '.join(palette['colors'])}
 Color reasoning: {palette['reasoning']}
 
 Specific image prompt: {nano_prompt}
+{series_instruction}
 
 {FRONT_LABEL_INSTRUCTION}
 
-CRITICAL: The product in the generated image must be visually identical to the product in the reference photos — same shape, same label, same colors, same branding. Place it naturally into the described scene with proper lighting and shadows."""
+CRITICAL: The product in the generated image must be visually identical to the product in the reference photos — same shape, same label, same colors, same branding. Place it naturally into the described scene with proper lighting and shadows.
+
+Shot on 35mm f/1.4 lens. Slight natural film grain, subtle lens vignetting. Colors feel real and slightly warm — not oversaturated. The image should feel like a professional product photograph, not a digital render.
+
+AVOID: hyper-realistic, 8K, ultra HD, CGI, 3D render, oversaturated, HDR look, stock photo aesthetic."""
 
     _log("\n=== PROMPT SENT TO NANO BANANA ===")
     _log(prompt)
@@ -98,6 +121,84 @@ CRITICAL: The product in the generated image must be visually identical to the p
         raise RuntimeError("Nano Banana returned no image data")
     except Exception as e:
         raise RuntimeError(f"Art direction preview failed: {e}") from e
+
+
+def generate_scene_preview(
+    art_direction: dict,
+    reference_images: list[bytes],
+    logo: bytes | None = None,
+) -> bytes:
+    """Generate a scene-only image for the art direction card.
+
+    Sends the product photos as reference so the model understands the product's
+    world — but the output image contains NO product. Just the environment,
+    lighting, and vibe where the product would live.
+
+    Args:
+        art_direction: One art direction dict from analyze_service.
+        reference_images: Product photos so the model knows the context.
+        logo: Optional brand logo bytes.
+
+    Returns:
+        PNG image bytes of the scene.
+    """
+    palette = art_direction["color_palette"]
+    treatment = _get_treatment(art_direction)
+    nano_prompt = art_direction.get("prompt_fragments", {}).get("nano_banana", "")
+    tone = art_direction.get("campaign_tone", "")
+    colors = palette.get("colors", [])
+    reasoning = palette.get("reasoning", "")
+
+    contents = []
+
+    # Send product photos as context — model needs to understand what product
+    # this scene is being built around, even though it won't render it
+    for i, ref in enumerate(reference_images):
+        contents.append(types.Part(text=f"[PRODUCT REFERENCE {i + 1} — study this product's style, brand, and audience. Do NOT render this product in the output image]:"))
+        contents.append(types.Part.from_bytes(data=ref, mime_type="image/png"))
+
+    if logo:
+        contents.append(types.Part(text="[BRAND LOGO — for brand context only. Do NOT render the logo in the output]:"))
+        contents.append(types.Part.from_bytes(data=logo, mime_type="image/png"))
+
+    prompt = f"""CRITICAL INSTRUCTION: Generate ONLY the background environment. ZERO products in the frame. No cans, no bottles, no boxes, no packaging, no branded items, no food, no drinks — NOTHING that is a product. The reference photos above are ONLY for understanding the brand's world. Do NOT reproduce or place any version of that product in this image.
+
+Generate a cinematic establishing shot of the ENVIRONMENT ONLY for this advertising concept.
+
+Scene direction: {treatment}
+
+Detailed scene concept: {nano_prompt}
+
+Campaign tone: {tone}
+
+Color palette: {', '.join(colors)}
+Color reasoning: {reasoning}
+
+The composition should leave a natural focal point — an empty surface, a clear space, a table edge, a ledge — where a product COULD be placed later, but nothing is there now. Just atmosphere, setting, and mood.
+
+Shot on a Canon EOS R5, 35mm f/1.4 lens. Slight film grain, subtle chromatic aberration on edges, natural lens vignetting. Minor dust particles visible in light shafts. Colors are slightly desaturated and muted — not oversaturated. White balance leans slightly warm. The image should feel like a professional photograph, not a 3D render.
+
+AVOID: hyper-realistic, 8K, ultra HD, ultra-detailed, perfect lighting, CGI, 3D render, digital art, overly sharp, oversaturated, HDR look, stock photo aesthetic.
+
+FINAL CHECK: If there is ANY product, bottle, can, package, or branded item visible in this image, you have FAILED. The frame must contain ONLY the environment."""
+
+    contents.append(types.Part(text=prompt))
+
+    try:
+        rate_limiter.check(MODEL_NANO_BANANA)
+        response = client.models.generate_content(
+            model=MODEL_NANO_BANANA,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                response_modalities=["TEXT", "IMAGE"],
+            ),
+        )
+        for part in response.candidates[0].content.parts:
+            if part.inline_data:
+                return part.inline_data.data
+        raise RuntimeError("Nano Banana returned no image data for scene preview")
+    except Exception as e:
+        raise RuntimeError(f"Scene preview generation failed: {e}") from e
 
 
 AD_FORMAT_LABELS = {

@@ -1,579 +1,673 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CampaignEditorProps {
+  campaignId: string;
   campaignName: string;
+  files: File[];
+  logo: File | null;
+  directionIndex: number;
+  artDirections: any[];
+  imageCount: number;
   onBack: () => void;
 }
 
-type ActiveTab = "Position" | "Tweaks";
-type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
-type ActiveMedia = "image" | "video" | "audio" | null;
+interface CampaignData {
+  id: string;
+  name: string;
+  status: string;
+  images?: string[];
+  video?: string;
+  jingle?: string;
+  final_video?: string;
+  error?: string;
+}
 
-const TABS: ActiveTab[] = ["Position", "Tweaks"];
+type GenerationPhase = "idle" | "generating" | "complete" | "error";
 
-const SIZES = ["Small", "Medium", "Large", "Full"];
+const API_BASE = "http://localhost:3001";
 
-const TWEAKS: string[] = ["Brighter", "Darker", "Warmer", "Cooler", "Bokeh", "Film grain", "Golden hour", "Soft shadow", "More space", "Closer crop"];
+// ─── Icons ───────────────────────────────────────────────────────────────────
 
-const CANVAS_SIZES: Record<AspectRatio, { w: number; h: number }> = {
-  "1:1":  { w: 340, h: 340 },
-  "4:5":  { w: 272, h: 340 },
-  "9:16": { w: 191, h: 340 },
-  "16:9": { w: 340, h: 191 },
-};
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function LeftSidebarIcon() {
+function BackArrowIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-      <rect x="1" y="1" width="14" height="14" rx="2" />
-      <line x1="5" y1="1" x2="5" y2="15" />
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 12H5" />
+      <path d="M12 5l-7 7 7 7" />
     </svg>
   );
 }
 
-function RightSidebarIcon() {
+function SpinnerIcon({ size = 48 }: { size?: number }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-      <rect x="1" y="1" width="14" height="14" rx="2" />
-      <line x1="11" y1="1" x2="11" y2="15" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 50 50"
+      style={{ animation: "spin 1s linear infinite" }}
+    >
+      <circle
+        cx="25"
+        cy="25"
+        r="20"
+        fill="none"
+        stroke="rgba(59,130,246,0.3)"
+        strokeWidth="4"
+      />
+      <circle
+        cx="25"
+        cy="25"
+        r="20"
+        fill="none"
+        stroke="#3b82f6"
+        strokeWidth="4"
+        strokeDasharray="31.4 94.2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
-function XIcon({ size = 8 }: { size?: number }) {
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+export default function CampaignEditor({
+  campaignId,
+  campaignName,
+  files,
+  logo,
+  directionIndex,
+  artDirections,
+  imageCount,
+  onBack,
+}: CampaignEditorProps) {
+  const [phase, setPhase] = useState<GenerationPhase>("idle");
+  const [statusText, setStatusText] = useState("Initializing campaign...");
+  const [progressText, setProgressText] = useState("");
+  const [errorText, setErrorText] = useState("");
+  const [campaignData, setCampaignData] = useState<CampaignData | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  const hasStarted = useRef(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Fetch completed campaign data
+  const fetchCampaignData = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/campaigns/${campaignId}`);
+      if (!res.ok) throw new Error(`Failed to fetch campaign: ${res.status}`);
+      const data: CampaignData = await res.json();
+      setCampaignData(data);
+      setPhase("complete");
+    } catch (err: any) {
+      setErrorText(err.message || "Failed to load campaign results.");
+      setPhase("error");
+    }
+  }, [campaignId]);
+
+  // Connect SSE for progress updates
+  const connectSSE = useCallback(() => {
+    const url = `${API_BASE}/api/campaigns/${campaignId}/stream?token=`;
+    const es = new EventSource(url);
+    eventSourceRef.current = es;
+
+    es.addEventListener("status", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        setStatusText(data.message || data.status || "Processing...");
+      } catch {
+        setStatusText(e.data);
+      }
+    });
+
+    es.addEventListener("progress", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        setProgressText(data.message || data.progress || "");
+      } catch {
+        setProgressText(e.data);
+      }
+    });
+
+    es.addEventListener("complete", (_e: MessageEvent) => {
+      setStatusText("Generation complete!");
+      setProgressText("");
+      es.close();
+      eventSourceRef.current = null;
+      fetchCampaignData();
+    });
+
+    es.addEventListener("error", (e: any) => {
+      // SSE error event from server (custom)
+      if (e.data) {
+        try {
+          const data = JSON.parse(e.data);
+          setErrorText(data.message || data.error || "An error occurred.");
+        } catch {
+          setErrorText(e.data);
+        }
+        setPhase("error");
+        es.close();
+        eventSourceRef.current = null;
+      }
+      // Browser-level reconnect errors are handled by EventSource automatically
+    });
+
+    return es;
+  }, [campaignId, fetchCampaignData]);
+
+  // Trigger generation on mount
+  useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+
+    const startGeneration = async () => {
+      setPhase("generating");
+      setStatusText("Starting campaign generation...");
+
+      // 1. Connect SSE first so we don't miss events
+      connectSSE();
+
+      // 2. Build FormData and POST to trigger generation
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append("product_photos", file);
+      });
+      if (logo) {
+        formData.append("logo", logo);
+      }
+      formData.append("direction_index", String(directionIndex));
+      formData.append("image_count", String(imageCount));
+
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/campaigns/${campaignId}/generate`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        if (!res.ok) {
+          const body = await res.text();
+          let msg = `Generation request failed (${res.status})`;
+          try {
+            const parsed = JSON.parse(body);
+            msg = parsed.error || parsed.message || msg;
+          } catch {
+            if (body) msg = body;
+          }
+          throw new Error(msg);
+        }
+      } catch (err: any) {
+        // If the POST itself fails, show error but keep SSE open in case
+        // the server processes it anyway (e.g., request was received)
+        if (err.name === "TypeError" && err.message.includes("fetch")) {
+          setErrorText(
+            "Cannot connect to server. Make sure the backend is running on port 3001."
+          );
+          setPhase("error");
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+        } else {
+          setErrorText(err.message);
+          setPhase("error");
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+        }
+      }
+    };
+
+    startGeneration();
+
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [campaignId, files, logo, directionIndex, imageCount, connectSSE]);
+
+  // Derive image URLs from campaign data
+  const imageUrls: string[] = [];
+  if (campaignData?.images) {
+    campaignData.images.forEach((img) => {
+      // If the image path is relative, prepend the API base
+      if (img.startsWith("http")) {
+        imageUrls.push(img);
+      } else {
+        imageUrls.push(`${API_BASE}/outputs/${campaignId}/${img}`);
+      }
+    });
+  }
+
+  const videoUrl = campaignData?.video
+    ? campaignData.video.startsWith("http")
+      ? campaignData.video
+      : `${API_BASE}/outputs/${campaignId}/${campaignData.video}`
+    : null;
+
+  const jingleUrl = campaignData?.jingle
+    ? campaignData.jingle.startsWith("http")
+      ? campaignData.jingle
+      : `${API_BASE}/outputs/${campaignId}/${campaignData.jingle}`
+    : null;
+
+  const finalVideoUrl = campaignData?.final_video
+    ? campaignData.final_video.startsWith("http")
+      ? campaignData.final_video
+      : `${API_BASE}/outputs/${campaignId}/${campaignData.final_video}`
+    : null;
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
+    <div
+      style={{
+        backgroundColor: "#0d0f14",
+        color: "#ffffff",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Spinner keyframe animation */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
 
-function DotsIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 4 16" fill="currentColor">
-      <circle cx="2" cy="2"  r="1.5" />
-      <circle cx="2" cy="8"  r="1.5" />
-      <circle cx="2" cy="14" r="1.5" />
-    </svg>
-  );
-}
-
-function DiagonalArrowIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="7" y1="17" x2="17" y2="7" />
-      <polyline points="7 7 17 7 17 17" />
-    </svg>
-  );
-}
-
-function VideoIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-      <rect x="2" y="5" width="15" height="14" rx="2" />
-      <path d="M17 9l5-3v12l-5-3V9z" />
-    </svg>
-  );
-}
-
-function MusicIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
-      <path d="M9 18V5l12-2v13" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="16" r="3" />
-    </svg>
-  );
-}
-
-// ─── Widgets ──────────────────────────────────────────────────────────────────
-
-function PlacementGrid({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return (
-    <div className="grid grid-cols-3 gap-1.5">
-      {Array.from({ length: 9 }, (_, i) => (
-        <button
-          key={i}
-          onClick={() => onChange(i)}
-          className={`aspect-square rounded-lg border transition-colors flex items-center justify-center ${
-            value === i
-              ? "border-blue-400/60 bg-blue-500/20"
-              : "border-white/[0.07] bg-white/[0.02] hover:border-white/20"
-          }`}
-        >
-          {i === 4 && <span className="w-1.5 h-1.5 rounded-full bg-white/30 block" />}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function PillSelector({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((opt) => (
-        <button
-          key={opt}
-          onClick={() => onChange(opt)}
-          className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
-            value === opt
-              ? "bg-blue-600/40 text-blue-300 border-blue-400/40"
-              : "bg-white/5 text-white/40 border-white/10 hover:text-white/60 hover:bg-white/10"
-          }`}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Delete overlay for image tiles ──────────────────────────────────────────
-
-function DeletableTile({
-  children,
-  onDelete,
-  className,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onDelete: () => void;
-  className: string;
-  onClick?: () => void;
-}) {
-  return (
-    <div className="relative group aspect-square">
-      <button onClick={onClick} className={`w-full h-full ${className}`}>
-        {children}
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/70 text-white/80 hover:text-white hover:bg-black/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-        aria-label="Delete"
+      {/* ── Top Bar ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          padding: "16px 24px",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          flexShrink: 0,
+        }}
       >
-        <XIcon size={7} />
-      </button>
-    </div>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export default function CampaignEditor({ campaignName, onBack }: CampaignEditorProps) {
-  const [editingName, setEditingName]           = useState(false);
-  const [name, setName]                         = useState(campaignName);
-  const [editingSubtitle, setEditingSubtitle]   = useState(false);
-  const [subtitle, setSubtitle]                 = useState("Cold Brew Blend");
-  const [leftOpen, setLeftOpen]                 = useState(true);
-  const [rightOpen, setRightOpen]               = useState(true);
-  const [activeTab, setActiveTab]               = useState<ActiveTab>("Position");
-  const [selectedRatio, setSelectedRatio]       = useState<AspectRatio>("1:1");
-  const [selectedSize, setSelectedSize]         = useState("Medium");
-  const [placement, setPlacement]               = useState(4);
-  const [zoomedImage, setZoomedImage]           = useState<string | null>(null);
-  const [selectedTweaks, setSelectedTweaks]     = useState<string[]>([]);
-  const [activeMedia, setActiveMedia]           = useState<ActiveMedia>(null);
-  const [uploads, setUploads]                   = useState([
-    { id: "1", label: "Front" },
-    { id: "2", label: "Side" },
-    { id: "3", label: "Detail" },
-  ]);
-
-  function toggleTweak(t: string) {
-    setSelectedTweaks((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
-  }
-
-  function addUpload() {
-    const n = uploads.length + 1;
-    setUploads((prev) => [...prev, { id: String(Date.now()), label: `Image ${n}` }]);
-  }
-
-  function deleteUpload(id: string) {
-    setUploads((prev) => prev.filter((u) => u.id !== id));
-  }
-
-
-  const canvas = CANVAS_SIZES[selectedRatio];
-
-  return (
-    <div className="flex flex-col h-screen" style={{ backgroundColor: "#0d0f14" }}>
-
-      {/* ── Body ── */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* ── Left sidebar ── */}
-        {leftOpen ? (
-          <div
-            className="w-[180px] border-r border-white/[0.07] flex flex-col flex-shrink-0"
-            style={{ background: "#0d0f14" }}
+        <button
+          onClick={onBack}
+          style={{
+            background: "none",
+            border: "none",
+            color: "rgba(255,255,255,0.6)",
+            cursor: "pointer",
+            padding: "8px",
+            borderRadius: "8px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "color 0.2s, background-color 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "#ffffff";
+            e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "rgba(255,255,255,0.6)";
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+          aria-label="Go back"
+        >
+          <BackArrowIcon />
+        </button>
+        <h1
+          style={{
+            fontSize: "16px",
+            fontWeight: 600,
+            margin: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {campaignName}
+        </h1>
+        {phase === "generating" && (
+          <span
+            style={{
+              fontSize: "12px",
+              color: "#3b82f6",
+              fontWeight: 500,
+              marginLeft: "auto",
+            }}
           >
-            {/* Sidebar header: Campaigns ← | collapse */}
-            <div className="flex items-center justify-between px-2 py-2 flex-shrink-0 border-b border-white/[0.04]">
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+            Generating...
+          </span>
+        )}
+        {phase === "complete" && (
+          <span
+            style={{
+              fontSize: "12px",
+              color: "#22c55e",
+              fontWeight: 500,
+              marginLeft: "auto",
+            }}
+          >
+            Complete
+          </span>
+        )}
+        {phase === "error" && (
+          <span
+            style={{
+              fontSize: "12px",
+              color: "#ef4444",
+              fontWeight: 500,
+              marginLeft: "auto",
+            }}
+          >
+            Error
+          </span>
+        )}
+      </div>
+
+      {/* ── Center Content ── */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent:
+            phase === "generating" || phase === "idle" ? "center" : "flex-start",
+          overflow: "auto",
+          padding: "32px 24px",
+        }}
+      >
+        {/* ── Generating / Idle State ── */}
+        {(phase === "generating" || phase === "idle") && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "24px",
+            }}
+          >
+            <SpinnerIcon size={64} />
+            <div style={{ textAlign: "center" }}>
+              <p
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 600,
+                  margin: "0 0 8px 0",
+                  color: "#ffffff",
+                }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M19 12H5" /><path d="M12 5l-7 7 7 7" />
-                </svg>
-                Campaigns
-              </button>
-              <button
-                onClick={() => setLeftOpen(false)}
-                className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
-                aria-label="Collapse left sidebar"
-              >
-                <LeftSidebarIcon />
-              </button>
-            </div>
-
-            {/* Scrollable content */}
-            <div
-              className="flex-1 overflow-y-auto"
-              style={{ scrollbarWidth: "none" } as React.CSSProperties}
-            >
-              {/* Campaign info */}
-              <div className="px-4 pt-4 pb-3 border-b border-white/[0.05]">
-                {editingName ? (
-                  <input
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onBlur={() => setEditingName(false)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingName(false); }}
-                    className="w-full bg-white/5 border border-blue-400/50 rounded-lg px-2 py-1 text-sm font-bold text-white outline-none"
-                  />
-                ) : (
-                  <p
-                    className="text-sm font-bold text-white truncate cursor-pointer hover:text-white/80 transition-colors"
-                    onClick={() => setEditingName(true)}
-                  >{name}</p>
-                )}
-                {editingSubtitle ? (
-                  <input
-                    autoFocus
-                    value={subtitle}
-                    onChange={(e) => setSubtitle(e.target.value)}
-                    onBlur={() => setEditingSubtitle(false)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingSubtitle(false); }}
-                    className="w-full bg-white/5 border border-blue-400/50 rounded-lg px-2 py-0.5 text-xs text-white/70 outline-none mt-0.5"
-                  />
-                ) : (
-                  <p
-                    className="text-xs text-white/40 mt-0.5 cursor-pointer hover:text-white/60 transition-colors"
-                    onClick={() => setEditingSubtitle(true)}
-                  >
-                    {subtitle || "Add subtitle…"}
-                  </p>
-                )}
-              </div>
-
-              {/* Uploaded */}
-              <div className="px-4 py-3 border-b border-white/[0.05]">
-                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-2">Uploaded</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {uploads.map((u) => (
-                    <DeletableTile
-                      key={u.id}
-                      onDelete={() => deleteUpload(u.id)}
-                      onClick={() => setZoomedImage(u.label)}
-                      className="rounded-xl border border-blue-400/30 bg-blue-500/5 hover:border-blue-400/60 flex items-center justify-center cursor-pointer transition-colors"
-                    >
-                      <span className="text-[10px] text-white/40 text-center px-1 leading-tight">{u.label}</span>
-                    </DeletableTile>
-                  ))}
-                  <button
-                    onClick={addUpload}
-                    className="aspect-square rounded-xl border border-dashed border-white/10 bg-white/[0.02] flex items-center justify-center text-white/30 hover:text-white/60 hover:border-white/20 transition-colors text-xl font-light"
-                    aria-label="Add upload"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* Media */}
-              <div className="px-4 py-3 pb-5">
-                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-2">Media</p>
-                <div className="flex flex-col gap-1.5">
-                  {([
-                    { id: "image", label: "Image", sub: "pending", active: true, icon: (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 flex-shrink-0">
-                        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
-                      </svg>
-                    )},
-                    { id: "video", label: "Video", sub: "15s · pending", active: false, icon: <VideoIcon /> },
-                    { id: "audio", label: "Audio", sub: "30s · pending", active: false, icon: <MusicIcon /> },
-                  ] as { id: ActiveMedia; label: string; sub: string; active: boolean; icon: React.ReactNode }[]).map((item) => {
-                    const isSelected = activeMedia === item.id;
-                    return (
-                      <button
-                        key={item.id as string}
-                        onClick={() => setActiveMedia(isSelected ? null : item.id)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-colors w-full ${
-                          isSelected
-                            ? "bg-blue-600/20 border-blue-500/30"
-                            : "bg-white/[0.03] border-white/[0.07] hover:border-white/15"
-                        }`}
-                      >
-                        {item.icon}
-                        <div>
-                          <p className="text-xs font-semibold text-white">{item.label}</p>
-                          <p className="text-[10px] text-white/40">{item.sub}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                {statusText}
+              </p>
+              {progressText && (
+                <p
+                  style={{
+                    fontSize: "14px",
+                    color: "rgba(255,255,255,0.5)",
+                    margin: 0,
+                  }}
+                >
+                  {progressText}
+                </p>
+              )}
             </div>
           </div>
-        ) : (
-          /* Collapsed left — narrow strip */
+        )}
+
+        {/* ── Error State ── */}
+        {phase === "error" && (
           <div
-            className="w-9 border-r border-white/[0.07] flex flex-col items-center gap-2 pt-2 flex-shrink-0"
-            style={{ background: "#0d0f14" }}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              maxWidth: "480px",
+              textAlign: "center",
+            }}
           >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(239,68,68,0.1)",
+                border: "2px solid rgba(239,68,68,0.3)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "28px",
+              }}
+            >
+              !
+            </div>
+            <p
+              style={{
+                fontSize: "18px",
+                fontWeight: 600,
+                margin: 0,
+                color: "#ef4444",
+              }}
+            >
+              Generation Failed
+            </p>
+            <p
+              style={{
+                fontSize: "14px",
+                color: "rgba(255,255,255,0.5)",
+                margin: 0,
+                lineHeight: "1.5",
+              }}
+            >
+              {errorText}
+            </p>
             <button
               onClick={onBack}
-              className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
-              aria-label="Back to campaigns"
+              style={{
+                marginTop: "8px",
+                padding: "10px 24px",
+                borderRadius: "10px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                backgroundColor: "transparent",
+                color: "#ffffff",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "border-color 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+              }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M19 12H5" /><path d="M12 5l-7 7 7 7" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setLeftOpen(true)}
-              className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
-              aria-label="Expand left sidebar"
-            >
-              <LeftSidebarIcon />
+              Back to Campaigns
             </button>
           </div>
         )}
 
-        {/* ── Center ── */}
-        <div
-          className="flex-1 flex flex-col overflow-auto"
-          style={{ background: "#0f1117" }}
-        >
-          {/* Center top bar */}
-          <div className="flex items-center justify-end px-4 py-2 border-b border-white/[0.04] flex-shrink-0">
-            <button className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-colors shadow-lg shadow-blue-900/40">
-              Save version
-            </button>
-          </div>
-
-          {/* Canvas area */}
-          <div className="flex-1 flex flex-col items-center justify-center p-6">
-          <div className="flex items-center gap-2 mb-6">
-            {(["1:1", "4:5", "9:16", "16:9"] as AspectRatio[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => setSelectedRatio(r)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  selectedRatio === r
-                    ? "bg-blue-600/40 text-blue-300 border-blue-400/40"
-                    : "text-white/40 border-white/10 hover:text-white/60"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-
-          <div
-            className="rounded-2xl bg-white shadow-2xl transition-all duration-300"
-            style={{ width: canvas.w, height: canvas.h }}
-          />
-
-          <p className="text-xs text-white/30 mt-3">
-            {selectedRatio}
-          </p>
-          </div>
-        </div>
-
-        {/* ── Right sidebar ── */}
-        {rightOpen ? (
-          <div
-            className="w-[260px] border-l border-white/[0.07] flex flex-col flex-shrink-0"
-            style={{ background: "#0d0f14" }}
-          >
-            {/* Sidebar header */}
-            <div className="flex items-center px-2 py-2 flex-shrink-0 border-b border-white/[0.04]">
-              <button
-                onClick={() => setRightOpen(false)}
-                className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors flex-shrink-0"
-                aria-label="Collapse right sidebar"
-              >
-                <RightSidebarIcon />
-              </button>
-
-              {activeMedia ? (
-                /* Media panel header */
-                <div className="flex items-center justify-between flex-1 ml-2">
-                  <span className="text-xs font-semibold text-white capitalize">{activeMedia}</span>
-                  <button
-                    onClick={() => setActiveMedia(null)}
-                    className="p-1 rounded-lg text-white/30 hover:text-white/60 transition-colors"
-                    aria-label="Close media panel"
-                  >
-                    <XIcon size={10} />
-                  </button>
+        {/* ── Complete State ── */}
+        {phase === "complete" && campaignData && (
+          <div style={{ width: "100%", maxWidth: "960px" }}>
+            {/* Generated Images */}
+            {imageUrls.length > 0 && (
+              <section style={{ marginBottom: "48px" }}>
+                <h2
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "rgba(255,255,255,0.4)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    marginBottom: "16px",
+                  }}
+                >
+                  Generated Images
+                </h2>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "12px",
+                  }}
+                >
+                  {imageUrls.map((url, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        aspectRatio: "1 / 1",
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                        border: "1px solid rgba(255,255,255,0.07)",
+                        backgroundColor: "rgba(255,255,255,0.02)",
+                        cursor: "pointer",
+                        transition: "border-color 0.2s",
+                      }}
+                      onClick={() => setZoomedImage(url)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor =
+                          "rgba(59,130,246,0.4)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor =
+                          "rgba(255,255,255,0.07)";
+                      }}
+                    >
+                      <img
+                        src={url}
+                        alt={`Generated ad image ${i + 1}`}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                /* Normal tabs */
-                <>
-                  <div className="flex items-center overflow-x-auto gap-0.5 flex-1 ml-1" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
-                    {TABS.map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`text-xs font-medium px-2.5 py-1.5 whitespace-nowrap transition-colors rounded-lg flex-shrink-0 ${
-                          activeTab === tab
-                            ? "text-white border-b-2 border-blue-400"
-                            : "text-white/40 hover:text-white/70"
-                        }`}
-                      >
-                        {tab}
-                      </button>
-                    ))}
-                  </div>
-                  <button className="p-1.5 text-white/30 hover:text-white/60 transition-colors flex-shrink-0 ml-1" aria-label="More options">
-                    <DotsIcon />
-                  </button>
-                </>
-              )}
-            </div>
+              </section>
+            )}
 
-            {/* Tab / media content */}
-            <div
-              className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5"
-              style={{ scrollbarWidth: "none" } as React.CSSProperties}
-            >
-              {activeMedia === "image" && (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Placement</p>
-                    <PlacementGrid value={placement} onChange={setPlacement} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Size</p>
-                    <PillSelector options={SIZES} value={selectedSize} onChange={setSelectedSize} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Tweaks</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {TWEAKS.map((opt) => {
-                        const on = selectedTweaks.includes(opt);
-                        return (
-                          <button key={opt} onClick={() => toggleTweak(opt)}
-                            className={`rounded-full px-3 py-1 text-xs border transition-colors ${on ? "bg-blue-600/40 text-blue-300 border-blue-400/40" : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60"}`}>
-                            {opt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
+            {/* Video Player */}
+            {videoUrl && (
+              <section style={{ marginBottom: "48px" }}>
+                <h2
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "rgba(255,255,255,0.4)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    marginBottom: "16px",
+                  }}
+                >
+                  Video Ad
+                </h2>
+                <div
+                  style={{
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                    backgroundColor: "#000000",
+                  }}
+                >
+                  <video
+                    src={videoUrl}
+                    controls
+                    style={{
+                      width: "100%",
+                      maxHeight: "480px",
+                      display: "block",
+                    }}
+                  />
+                </div>
+              </section>
+            )}
 
-              {activeMedia === "video" && (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Duration</p>
-                    <PillSelector options={["15s", "30s", "60s"]} value="15s" onChange={() => {}} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Format</p>
-                    <PillSelector options={["Landscape", "Portrait", "Square"]} value="Landscape" onChange={() => {}} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Style</p>
-                    <PillSelector options={["Dynamic", "Cinematic", "Minimal"]} value="Dynamic" onChange={() => {}} />
-                  </div>
-                </>
-              )}
+            {/* Jingle / Audio Player */}
+            {jingleUrl && (
+              <section style={{ marginBottom: "48px" }}>
+                <h2
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "rgba(255,255,255,0.4)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    marginBottom: "16px",
+                  }}
+                >
+                  Campaign Jingle
+                </h2>
+                <div
+                  style={{
+                    borderRadius: "12px",
+                    padding: "20px",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                    backgroundColor: "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  <audio
+                    src={jingleUrl}
+                    controls
+                    style={{ width: "100%", display: "block" }}
+                  />
+                </div>
+              </section>
+            )}
 
-              {activeMedia === "audio" && (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Duration</p>
-                    <PillSelector options={["15s", "30s", "60s"]} value="30s" onChange={() => {}} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Mood</p>
-                    <PillSelector options={["Upbeat", "Calm", "Dramatic", "Playful", "Sad", "Melodic"]} value="Upbeat" onChange={() => {}} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Instruments</p>
-                    <PillSelector options={["Guitar", "Piano", "Synth", "Drums", "Vocals"]} value="Piano" onChange={() => {}} />
-                  </div>
-                </>
-              )}
-
-              {!activeMedia && (
-                <>
-                  {/* Position tab */}
-                  {activeTab === "Position" && (
-                    <>
-                      <div className="flex flex-col gap-2">
-                        <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Placement</p>
-                        <PlacementGrid value={placement} onChange={setPlacement} />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Size</p>
-                        <PillSelector options={SIZES} value={selectedSize} onChange={setSelectedSize} />
-                      </div>
-                    </>
-                  )}
-
-                  {/* Tweaks tab */}
-                  {activeTab === "Tweaks" && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {TWEAKS.map((opt) => {
-                        const on = selectedTweaks.includes(opt);
-                        return (
-                          <button key={opt} onClick={() => toggleTweak(opt)}
-                            className={`rounded-full px-3 py-1 text-xs border transition-colors ${on ? "bg-blue-600/40 text-blue-300 border-blue-400/40" : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60"}`}>
-                            {opt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex-shrink-0 px-4 py-4 border-t border-white/[0.05]">
-              <button className="w-full py-3 rounded-xl text-sm font-semibold text-white border border-white/20 hover:border-white/40 flex items-center justify-center gap-2 transition-colors">
-                Regenerate with changes
-                <DiagonalArrowIcon />
-              </button>
-              <p className="text-[10px] text-white/25 text-center mt-1.5">Uses 1 generation credit</p>
-            </div>
-          </div>
-        ) : (
-          /* Collapsed right — narrow strip */
-          <div
-            className="w-9 border-l border-white/[0.07] flex flex-col items-center pt-2 flex-shrink-0"
-            style={{ background: "#0d0f14" }}
-          >
-            <button
-              onClick={() => setRightOpen(true)}
-              className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
-              aria-label="Expand right sidebar"
-            >
-              <RightSidebarIcon />
-            </button>
+            {/* Final Composed Video */}
+            {finalVideoUrl && (
+              <section style={{ marginBottom: "48px" }}>
+                <h2
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "rgba(255,255,255,0.4)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    marginBottom: "16px",
+                  }}
+                >
+                  Final Ad
+                </h2>
+                <div
+                  style={{
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    border: "2px solid rgba(59,130,246,0.3)",
+                    backgroundColor: "#000000",
+                  }}
+                >
+                  <video
+                    src={finalVideoUrl}
+                    controls
+                    style={{
+                      width: "100%",
+                      maxHeight: "480px",
+                      display: "block",
+                    }}
+                  />
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>
@@ -581,21 +675,59 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
       {/* ── Lightbox ── */}
       {zoomedImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            backgroundColor: "rgba(0,0,0,0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
           onClick={() => setZoomedImage(null)}
         >
-          <div
-            className="w-80 h-80 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center"
+          <img
+            src={zoomedImage}
+            alt="Zoomed view"
+            style={{
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              borderRadius: "12px",
+              objectFit: "contain",
+              boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
+            }}
             onClick={(e) => e.stopPropagation()}
-          >
-            <span className="text-white/50 text-sm">{zoomedImage}</span>
-          </div>
+          />
           <button
             onClick={() => setZoomedImage(null)}
-            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            style={{
+              position: "absolute",
+              top: "24px",
+              right: "24px",
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(255,255,255,0.1)",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "20px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background-color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)";
+            }}
             aria-label="Close lightbox"
           >
-            <XIcon size={16} />
+            &#x2715;
           </button>
         </div>
       )}

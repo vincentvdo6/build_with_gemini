@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from server.routes.campaigns import router as campaigns_router
 from server.routes.generate import router as generate_router
@@ -24,6 +25,11 @@ app.add_middleware(
 app.include_router(campaigns_router, prefix="/api/campaigns", tags=["campaigns"])
 app.include_router(generate_router, prefix="/api/campaigns", tags=["generate"])
 app.include_router(sse_router, prefix="/api/campaigns", tags=["sse"])
+
+
+# Serve generated assets
+os.makedirs("outputs", exist_ok=True)
+app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 
 @app.get("/health")
