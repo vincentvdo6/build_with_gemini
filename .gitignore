@@ -9,6 +9,8 @@ __pycache__/
 venv/
 .venv/
 
+sample_photos/
+
 # Claude Code (personal config)
 CLAUDE.md
 .claude/

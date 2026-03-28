@@ -1,7 +1,7 @@
 import json
 import re
 from google.genai import types
-from services.gemini_client import client
+from services.gemini_client import client, rate_limiter
 from config import MODEL_FLASH
 
 
@@ -48,7 +48,7 @@ If generating a 3rd direction: it must be as specific and story-driven as the fi
 
 ## Additional rules:
 - Extract dominant colors from the actual product image, not guessed
-- Generate exactly 2 art directions (3 only if the third is genuinely strong and distinct)
+- Generate exactly 3 art directions — no more, no less
 - Visual treatments must be specific enough for a photographer to execute on the spot
 - Prompt fragments must reference the actual product and place it in the scene described by the visual treatment
 - Every direction must tell a story — who is using this product, when, why, and what does the moment feel like?"""
@@ -81,6 +81,7 @@ def analyze_product(
     contents.append(types.Part(text=ANALYSIS_PROMPT))
 
     try:
+        rate_limiter.check(MODEL_FLASH)
         response = client.models.generate_content(
             model=MODEL_FLASH,
             contents=contents,
@@ -94,6 +95,47 @@ def analyze_product(
         result = json.loads(raw)
         if isinstance(result, list):
             result = result[0]
+
+        # Normalize art directions — fix inconsistent key names from the model
+        for ad in result.get("art_directions", []):
+            # Normalize visual_treatment
+            if "visual_treatment" not in ad:
+                for alt in ("treatment", "visual_direction", "scene"):
+                    if alt in ad:
+                        ad["visual_treatment"] = ad.pop(alt)
+                        break
+                else:
+                    ad["visual_treatment"] = "MISSING — model did not return this field"
+
+            # Normalize prompt_fragments
+            if "prompt_fragments" not in ad:
+                for alt in ("prompt_fragment", "prompts", "fragments"):
+                    if alt in ad:
+                        ad["prompt_fragments"] = ad.pop(alt)
+                        break
+                else:
+                    ad["prompt_fragments"] = {"nano_banana": "", "veo": "", "lyria": ""}
+
+            # Ensure all three prompt fragment keys exist
+            frags = ad["prompt_fragments"]
+            for key in ("nano_banana", "veo", "lyria"):
+                if key not in frags:
+                    frags[key] = ""
+
+            # Normalize other expected keys
+            ad.setdefault("name", "Unnamed Direction")
+            ad.setdefault("target_audience", "")
+            ad.setdefault("campaign_tone", "")
+            ad.setdefault("color_palette", {"colors": [], "reasoning": ""})
+
+        # Ensure exactly 3 art directions
+        directions = result.get("art_directions", [])
+        if len(directions) < 3:
+            raise RuntimeError(
+                f"Model returned {len(directions)} art direction(s), need exactly 3. "
+                "Retrying may produce better results."
+            )
+
         return result
     except Exception as e:
         raise RuntimeError(f"Product analysis failed: {e}") from e
