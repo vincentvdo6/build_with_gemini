@@ -1,15 +1,16 @@
 "use client";
 
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { useEffect } from "react";
+import { signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-config";
+import { useRouter } from "next/navigation";
 
 const googleProvider = new GoogleAuthProvider();
 
 export function GoogleButton({
   disabled,
   label = "Continue with Google",
-  onSuccess,
   onError,
 }: {
   disabled: boolean;
@@ -17,9 +18,11 @@ export function GoogleButton({
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }) {
-  const handleClick = async () => {
-    try {
-      const credential = await signInWithPopup(auth, googleProvider);
+  const router = useRouter();
+
+  useEffect(() => {
+    getRedirectResult(auth).then(async (credential) => {
+      if (!credential) return;
       const user = credential.user;
       await setDoc(
         doc(db, "users", user.uid),
@@ -33,11 +36,18 @@ export function GoogleButton({
         },
         { merge: true }
       );
-      onSuccess?.();
-    } catch (err: unknown) {
+      router.push("/dashboard");
+    }).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : "Google sign-in failed. Please try again.";
       onError?.(message);
-    }
+    });
+  }, [router, onError]);
+
+  const handleClick = () => {
+    signInWithRedirect(auth, googleProvider).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : "Google sign-in failed. Please try again.";
+      onError?.(message);
+    });
   };
 
   return (
