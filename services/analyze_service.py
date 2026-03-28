@@ -46,6 +46,13 @@ Direction 1 is the obvious play — the direction the brand would probably do th
 Direction 2 is the "wait, that actually works?" angle — a context or visual treatment that REFRAMES the product entirely. Same product, completely different brand story. It should feel surprising but make total sense when you see it.
 If generating a 3rd direction: it must be as specific and story-driven as the first two. A white/minimal studio backdrop is NEVER acceptable — it tells no story. Every direction must place the product in a real moment with real context.
 
+RULE 4 — Veo and Lyria pacing must match.
+The veo prompt fragment and lyria prompt fragment must have MATCHING PACING:
+- If the video is slow/cinematic (slow pans, smooth tracking), the music must be low BPM (70-95), ambient, atmospheric
+- If the video is medium energy (steady movement, reveal shots), the music must be mid BPM (95-115), rhythmic but not aggressive
+- If the video is high energy (quick cuts, fast motion, dynamic camera), the music must be high BPM (115-140), driving and intense
+State the pacing category explicitly in both the veo and lyria prompts so they align. A slow cinematic pan with 140 BPM punk rock is a failure. A fast-cut montage with 70 BPM ambient is a failure.
+
 ## Additional rules:
 - Extract dominant colors from the actual product image, not guessed
 - Generate exactly 3 art directions — no more, no less
