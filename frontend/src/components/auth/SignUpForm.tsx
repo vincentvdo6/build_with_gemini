@@ -52,7 +52,7 @@ function PasswordStrength({ password }: { password: string }) {
   if (/[^A-Za-z0-9]/.test(password)) strength++;
 
   const labels = ["Weak", "Fair", "Good", "Strong"];
-  const colors = ["bg-red-400", "bg-yellow-400", "bg-violet-400", "bg-green-400"];
+  const colors = ["bg-red-400", "bg-yellow-400", "bg-blue-400", "bg-green-400"];
 
   return (
     <div className="flex items-center gap-2 mt-1.5">
@@ -206,11 +206,11 @@ export function SignUpForm() {
 
       <p className="text-xs text-white/30 leading-relaxed">
         By creating an account you agree to our{" "}
-        <Link href="/terms" className="text-violet-400/70 hover:text-violet-300 transition-colors">
+        <Link href="/terms" className="text-blue-400/70 hover:text-blue-300 transition-colors">
           Terms of Service
         </Link>{" "}
         and{" "}
-        <Link href="/privacy" className="text-violet-400/70 hover:text-violet-300 transition-colors">
+        <Link href="/privacy" className="text-blue-400/70 hover:text-blue-300 transition-colors">
           Privacy Policy
         </Link>
         .
@@ -221,11 +221,11 @@ export function SignUpForm() {
         disabled={loading}
         className={[
           "flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3",
-          "bg-violet-600 text-sm font-semibold text-white",
-          "transition-all duration-200 hover:bg-violet-500 active:scale-[0.98]",
-          "focus:outline-none focus:ring-2 focus:ring-violet-400/50 focus:ring-offset-2 focus:ring-offset-transparent",
-          "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-violet-600",
-          "shadow-lg shadow-violet-900/40",
+          "bg-blue-600 text-sm font-semibold text-white",
+          "transition-all duration-200 hover:bg-blue-500 active:scale-[0.98]",
+          "focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:ring-offset-2 focus:ring-offset-transparent",
+          "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-blue-600",
+          "shadow-lg shadow-blue-900/40",
         ].join(" ")}
       >
         {loading ? (<><Spinner /> Creating account…</>) : "Create account"}
@@ -233,7 +233,7 @@ export function SignUpForm() {
 
       <p className="text-center text-sm text-white/40">
         Already have an account?{" "}
-        <Link href="/auth/login" className="text-violet-400 font-medium hover:text-violet-300 transition-colors">
+        <Link href="/auth/login" className="text-blue-400 font-medium hover:text-blue-300 transition-colors">
           Sign in
         </Link>
       </p>
