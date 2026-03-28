@@ -26,7 +26,7 @@ Return a JSON object with this exact structure:
       "campaign_tone": "3-4 words",
       "prompt_fragments": {
         "nano_banana": "Detailed image generation prompt for this direction — include lighting, composition, setting, props, mood, and the product in context",
-        "veo": "Video scene description — camera movement, pacing, setting, action, mood. 8 seconds of story.",
+        "veo": "Video scene description — camera movement, pacing, setting, action, mood. 8 seconds of story. MUST include an exact visual description of the product (color, shape, packaging type, brand name, label details) so the video model renders the correct product without reference images.",
         "lyria": "Music genre, BPM, specific instruments, mood, energy level"
       }
     }
@@ -104,36 +104,30 @@ def analyze_product(
             result = result[0]
 
         # Normalize art directions — fix inconsistent key names from the model
+        def _normalize_key(d: dict, target: str, alts: tuple, default="") -> None:
+            """Check alternative key names and normalize to target key."""
+            if target not in d or not d[target]:
+                for alt in alts:
+                    if alt in d and d[alt]:
+                        d[target] = d.pop(alt)
+                        return
+                d.setdefault(target, default)
+
         for ad in result.get("art_directions", []):
-            # Normalize visual_treatment
-            if "visual_treatment" not in ad:
-                for alt in ("treatment", "visual_direction", "scene"):
-                    if alt in ad:
-                        ad["visual_treatment"] = ad.pop(alt)
-                        break
-                else:
-                    ad["visual_treatment"] = "MISSING — model did not return this field"
+            _normalize_key(ad, "name", ("direction_name", "title", "direction"), "Unnamed Direction")
+            _normalize_key(ad, "visual_treatment", ("treatment", "visual_direction", "scene", "setting"))
+            _normalize_key(ad, "target_audience", ("audience", "target", "demographic", "demographics"))
+            _normalize_key(ad, "campaign_tone", ("tone", "brand_tone", "mood", "voice"))
+            _normalize_key(ad, "color_palette", ("palette", "colors", "color"), {"colors": [], "reasoning": ""})
 
-            # Normalize prompt_fragments
-            if "prompt_fragments" not in ad:
-                for alt in ("prompt_fragment", "prompts", "fragments"):
-                    if alt in ad:
-                        ad["prompt_fragments"] = ad.pop(alt)
-                        break
-                else:
-                    ad["prompt_fragments"] = {"nano_banana": "", "veo": "", "lyria": ""}
+            # Normalize prompt_fragments container
+            _normalize_key(ad, "prompt_fragments", ("prompt_fragment", "prompts", "fragments"), {})
 
-            # Ensure all three prompt fragment keys exist
+            # Normalize prompt fragment sub-keys
             frags = ad["prompt_fragments"]
-            for key in ("nano_banana", "veo", "lyria"):
-                if key not in frags:
-                    frags[key] = ""
-
-            # Normalize other expected keys
-            ad.setdefault("name", "Unnamed Direction")
-            ad.setdefault("target_audience", "")
-            ad.setdefault("campaign_tone", "")
-            ad.setdefault("color_palette", {"colors": [], "reasoning": ""})
+            _normalize_key(frags, "nano_banana", ("imagen", "image", "image_prompt", "nano"))
+            _normalize_key(frags, "veo", ("video", "video_prompt"))
+            _normalize_key(frags, "lyria", ("music", "audio", "audio_prompt", "jingle"))
 
         # Ensure exactly 3 art directions
         directions = result.get("art_directions", [])

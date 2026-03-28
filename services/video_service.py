@@ -28,15 +28,20 @@ def generate_video(
         rate_limiter.check(MODEL_VEO)
 
         # Phase 1: Submit
-        config = types.GenerateVideosConfig(
-            aspect_ratio="16:9",
-        )
-
+        ref_imgs = None
         if reference_images:
-            config.reference_images = [
-                types.Image(image_bytes=img, mime_type="image/png")
+            ref_imgs = [
+                types.VideoGenerationReferenceImage(
+                    image=types.Image(image_bytes=img, mime_type="image/png"),
+                    reference_type="ASSET",
+                )
                 for img in reference_images[:3]
             ]
+
+        config = types.GenerateVideosConfig(
+            reference_images=ref_imgs,
+            aspect_ratio="16:9",
+        )
 
         operation = client.models.generate_videos(
             model=MODEL_VEO,
