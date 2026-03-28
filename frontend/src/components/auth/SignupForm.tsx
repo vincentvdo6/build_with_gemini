@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  updateProfile,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase-config";
@@ -142,6 +143,7 @@ async function saveUserToFirestore(user: {
       displayName: user.displayName,
       photoURL: user.photoURL,
       provider: user.providerId,
+      createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
     },
     { merge: true }
@@ -153,55 +155,66 @@ async function saveUserToFirestore(user: {
 interface FormErrors {
   email?: string;
   password?: string;
+  confirmPassword?: string;
+  displayName?: string;
   global?: string;
 }
 
-function validate(email: string, password: string): FormErrors {
+function validate(email: string, password: string, confirmPassword: string): FormErrors {
   const errors: FormErrors = {};
   if (!email) errors.email = "Email is required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email";
   if (!password) errors.password = "Password is required";
   else if (password.length < 8) errors.password = "Password must be at least 8 characters";
+  if (!confirmPassword) errors.confirmPassword = "Please confirm your password";
+  else if (password !== confirmPassword) errors.confirmPassword = "Passwords do not match";
   return errors;
 }
 
 const googleProvider = new GoogleAuthProvider();
 
-export function LoginForm() {
+export function SignupForm() {
   const router = useRouter();
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const fieldErrors = validate(email, password);
+    const fieldErrors = validate(email, password, confirmPassword);
     if (Object.keys(fieldErrors).length) { setErrors(fieldErrors); return; }
     setErrors({});
     setLoading(true);
 
     try {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
       const user = credential.user;
+
+      if (displayName.trim()) {
+        await updateProfile(user, { displayName: displayName.trim() });
+      }
+
       await saveUserToFirestore({
         uid: user.uid,
         email: user.email,
-        displayName: user.displayName,
+        displayName: displayName.trim() || user.displayName,
         photoURL: user.photoURL,
         providerId: "password",
       });
       router.push("/dashboard");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Login failed. Please try again.";
+      const message = err instanceof Error ? err.message : "Registration failed. Please try again.";
       setErrors({ global: message });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignUp = async () => {
     setErrors({});
     setLoading(true);
 
@@ -217,7 +230,7 @@ export function LoginForm() {
       });
       router.push("/dashboard");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Google sign-in failed. Please try again.";
+      const message = err instanceof Error ? err.message : "Google sign-up failed. Please try again.";
       setErrors({ global: message });
     } finally {
       setLoading(false);
@@ -234,9 +247,26 @@ export function LoginForm() {
       )}
 
       {/* OAuth */}
-      <GoogleButton disabled={loading} onClick={handleGoogleSignIn} />
+      <GoogleButton disabled={loading} onClick={handleGoogleSignUp} />
 
-      <Divider label="or sign in with email" />
+      <Divider label="or sign up with email" />
+
+      {/* Display name */}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="displayName" className="text-sm font-medium text-white/60">
+          Full name <span className="text-white/20">(optional)</span>
+        </label>
+        <Input
+          id="displayName"
+          type="text"
+          placeholder="Jane Doe"
+          value={displayName}
+          onChange={setDisplayName}
+          autoComplete="name"
+          disabled={loading}
+          error={errors.displayName}
+        />
+      </div>
 
       {/* Email */}
       <div className="flex flex-col gap-1.5">
@@ -257,17 +287,9 @@ export function LoginForm() {
 
       {/* Password */}
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <label htmlFor="password" className="text-sm font-medium text-white/60">
-            Password
-          </label>
-          <Link
-            href="/auth/forgot-password"
-            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
-          >
-            Forgot password?
-          </Link>
-        </div>
+        <label htmlFor="password" className="text-sm font-medium text-white/60">
+          Password
+        </label>
         <div className="relative">
           <Input
             id="password"
@@ -275,7 +297,7 @@ export function LoginForm() {
             placeholder="••••••••"
             value={password}
             onChange={setPassword}
-            autoComplete="current-password"
+            autoComplete="new-password"
             disabled={loading}
             error={errors.password}
           />
@@ -301,6 +323,23 @@ export function LoginForm() {
         </div>
       </div>
 
+      {/* Confirm password */}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="confirmPassword" className="text-sm font-medium text-white/60">
+          Confirm password
+        </label>
+        <Input
+          id="confirmPassword"
+          type={showPassword ? "text" : "password"}
+          placeholder="••••••••"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          autoComplete="new-password"
+          disabled={loading}
+          error={errors.confirmPassword}
+        />
+      </div>
+
       {/* Submit */}
       <button
         type="submit"
@@ -317,21 +356,21 @@ export function LoginForm() {
         {loading ? (
           <>
             <Spinner />
-            Signing in…
+            Creating account…
           </>
         ) : (
-          "Sign in"
+          "Create account"
         )}
       </button>
 
-      {/* Sign up link */}
+      {/* Sign in link */}
       <p className="text-center text-sm text-white/40">
-        Don&apos;t have an account?{" "}
+        Already have an account?{" "}
         <Link
-          href="/auth/signup"
+          href="/auth/login"
           className="text-violet-400 font-medium hover:text-violet-300 transition-colors"
         >
-          Create one
+          Sign in
         </Link>
       </p>
     </form>
