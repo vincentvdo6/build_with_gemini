@@ -7,45 +7,15 @@ interface CampaignEditorProps {
   onBack: () => void;
 }
 
-type ActiveTab = "Background" | "Position" | "Text" | "Style" | "Tweaks";
+type ActiveTab = "Position" | "Tweaks";
 type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
+type ActiveMedia = "image" | "video" | "audio" | null;
 
-const TABS: ActiveTab[] = ["Background", "Position", "Text", "Style", "Tweaks"];
-
-const STUDIOS = [
-  { name: "White studio", desc: "Clean minimal",  color: "#ffffff" },
-  { name: "Warm cream",   desc: "Soft neutral",   color: "#f5e6c8" },
-  { name: "Dark studio",  desc: "Sleek dramatic", color: "#1a1a2e" },
-];
-
-const SCENES = [
-  { name: "Cafe & coffee",     desc: "Warm wood ambient",  color: "#c17f3a" },
-  { name: "Nature & outdoors", desc: "Lush golden hour",   color: "#4a7c3f" },
-  { name: "Linen & marble",    desc: "Editorial luxury",   color: "#d4c5b0" },
-  { name: "Neon city night",   desc: "Bold electric",      color: "#1e3a8a" },
-  { name: "Beach & summer",    desc: "Bright coastal",     color: "#7dd3fc" },
-  { name: "Cozy fireplace",    desc: "Winter warm glow",   color: "#c2410c" },
-  { name: "Rainy window",      desc: "Moody cinematic",    color: "#64748b" },
-];
-
-const PERSONALITIES = [
-  { name: "Lifestyle",   desc: "Natural in-use"   },
-  { name: "Editorial",   desc: "Magazine fashion" },
-  { name: "Minimal",     desc: "Clean spacious"   },
-  { name: "Bold & loud", desc: "High contrast"    },
-  { name: "Luxury",      desc: "Rich gold tones"  },
-  { name: "Playful",     desc: "Fun colourful"    },
-];
+const TABS: ActiveTab[] = ["Position", "Tweaks"];
 
 const SIZES = ["Small", "Medium", "Large", "Full"];
-const FONT_STYLES = ["Clean", "Bold", "Serif", "Script"];
 
-const TWEAKS: { label: string; options: string[] }[] = [
-  { label: "ADJUSTMENTS", options: ["Brighter","Darker","Warmer","Cooler","More space","Closer crop"] },
-  { label: "CAMERA",      options: ["Bokeh","Lens flare","Film grain","Wide angle","Macro","Overhead"] },
-  { label: "COLOUR GRADE",options: ["Golden hour","Faded film","High contrast","Desaturated","Vivid pop","Moody dark"] },
-  { label: "EFFECTS",     options: ["Soft shadow","Reflection","Steam / mist","Sparkle","Confetti","Floating props"] },
-];
+const TWEAKS: string[] = ["Brighter", "Darker", "Warmer", "Cooler", "Bokeh", "Film grain", "Golden hour", "Soft shadow", "More space", "Closer crop"];
 
 const CANVAS_SIZES: Record<AspectRatio, { w: number; h: number }> = {
   "1:1":  { w: 340, h: 340 },
@@ -197,35 +167,21 @@ function DeletableTile({
 export default function CampaignEditor({ campaignName, onBack }: CampaignEditorProps) {
   const [editingName, setEditingName]           = useState(false);
   const [name, setName]                         = useState(campaignName);
+  const [editingSubtitle, setEditingSubtitle]   = useState(false);
+  const [subtitle, setSubtitle]                 = useState("Cold Brew Blend");
   const [leftOpen, setLeftOpen]                 = useState(true);
   const [rightOpen, setRightOpen]               = useState(true);
-  const [activeTab, setActiveTab]               = useState<ActiveTab>("Background");
+  const [activeTab, setActiveTab]               = useState<ActiveTab>("Position");
   const [selectedRatio, setSelectedRatio]       = useState<AspectRatio>("1:1");
-  const [selectedStudio, setSelectedStudio]     = useState("White studio");
-  const [selectedScene, setSelectedScene]       = useState<string | null>(null);
-  const [selectedPersonality, setSelectedPersonality] = useState("Lifestyle");
   const [selectedSize, setSelectedSize]         = useState("Medium");
-  const [selectedFontStyle, setSelectedFontStyle] = useState("Clean");
   const [placement, setPlacement]               = useState(4);
-  const [textPlacement, setTextPlacement]       = useState(4);
-  const [depthValue, setDepthValue]             = useState(30);
-  const [lightingValue, setLightingValue]       = useState(30);
-  const [showBrandName, setShowBrandName]       = useState(false);
-  const [showTagline, setShowTagline]           = useState(false);
-  const [showPriceCTA, setShowPriceCTA]         = useState(false);
-  const [selectedGenerated, setSelectedGenerated] = useState(0);
   const [zoomedImage, setZoomedImage]           = useState<string | null>(null);
   const [selectedTweaks, setSelectedTweaks]     = useState<string[]>([]);
+  const [activeMedia, setActiveMedia]           = useState<ActiveMedia>(null);
   const [uploads, setUploads]                   = useState([
     { id: "1", label: "Front" },
     { id: "2", label: "Side" },
     { id: "3", label: "Detail" },
-  ]);
-  const [generatedImages, setGeneratedImages] = useState([
-    { id: 0, label: "v1" },
-    { id: 1, label: "v2" },
-    { id: 2, label: "—"  },
-    { id: 3, label: "—"  },
   ]);
 
   function toggleTweak(t: string) {
@@ -241,13 +197,6 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
     setUploads((prev) => prev.filter((u) => u.id !== id));
   }
 
-  function deleteGenerated(id: number) {
-    setGeneratedImages((prev) => prev.filter((g) => g.id !== id));
-    if (selectedGenerated === id) {
-      const remaining = generatedImages.filter((g) => g.id !== id);
-      if (remaining.length > 0) setSelectedGenerated(remaining[0].id);
-    }
-  }
 
   const canvas = CANVAS_SIZES[selectedRatio];
 
@@ -300,15 +249,28 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
                     className="w-full bg-white/5 border border-blue-400/50 rounded-lg px-2 py-1 text-sm font-bold text-white outline-none"
                   />
                 ) : (
-                  <p className="text-sm font-bold text-white truncate">{name}</p>
+                  <p
+                    className="text-sm font-bold text-white truncate cursor-pointer hover:text-white/80 transition-colors"
+                    onClick={() => setEditingName(true)}
+                  >{name}</p>
                 )}
-                <p className="text-xs text-white/40 mt-0.5">Cold Brew Blend</p>
-                <button
-                  onClick={() => setEditingName(true)}
-                  className="mt-3 w-full px-3 py-2 rounded-xl border border-white/10 text-sm font-medium text-white/70 hover:text-white hover:border-white/20 bg-white/[0.02] transition-colors"
-                >
-                  Edit name
-                </button>
+                {editingSubtitle ? (
+                  <input
+                    autoFocus
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    onBlur={() => setEditingSubtitle(false)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingSubtitle(false); }}
+                    className="w-full bg-white/5 border border-blue-400/50 rounded-lg px-2 py-0.5 text-xs text-white/70 outline-none mt-0.5"
+                  />
+                ) : (
+                  <p
+                    className="text-xs text-white/40 mt-0.5 cursor-pointer hover:text-white/60 transition-colors"
+                    onClick={() => setEditingSubtitle(true)}
+                  >
+                    {subtitle || "Add subtitle…"}
+                  </p>
+                )}
               </div>
 
               {/* Uploaded */}
@@ -335,45 +297,38 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
                 </div>
               </div>
 
-              {/* Generated */}
-              <div className="px-4 py-3 border-b border-white/[0.05]">
-                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-2">Generated</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {generatedImages.map((g) => (
-                    <DeletableTile
-                      key={g.id}
-                      onDelete={() => deleteGenerated(g.id)}
-                      onClick={() => setSelectedGenerated(g.id)}
-                      className={`rounded-xl border flex items-center justify-center transition-colors ${
-                        selectedGenerated === g.id
-                          ? "border-blue-400/60 bg-blue-500/10"
-                          : "border-white/[0.07] bg-white/[0.03] hover:border-white/20"
-                      }`}
-                    >
-                      <span className="text-[10px] text-white/30">{g.label}</span>
-                    </DeletableTile>
-                  ))}
-                </div>
-              </div>
-
               {/* Media */}
               <div className="px-4 py-3 pb-5">
                 <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-2">Media</p>
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600/20 border border-blue-500/30">
-                    <VideoIcon />
-                    <div>
-                      <p className="text-xs font-semibold text-white">Ad video</p>
-                      <p className="text-[10px] text-white/40">15s · pending</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07]">
-                    <MusicIcon />
-                    <div>
-                      <p className="text-xs font-semibold text-white">Audio jingle</p>
-                      <p className="text-[10px] text-white/40">30s · pending</p>
-                    </div>
-                  </div>
+                  {([
+                    { id: "image", label: "Image", sub: "pending", active: true, icon: (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 flex-shrink-0">
+                        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    )},
+                    { id: "video", label: "Video", sub: "15s · pending", active: false, icon: <VideoIcon /> },
+                    { id: "audio", label: "Audio", sub: "30s · pending", active: false, icon: <MusicIcon /> },
+                  ] as { id: ActiveMedia; label: string; sub: string; active: boolean; icon: React.ReactNode }[]).map((item) => {
+                    const isSelected = activeMedia === item.id;
+                    return (
+                      <button
+                        key={item.id as string}
+                        onClick={() => setActiveMedia(isSelected ? null : item.id)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-colors w-full ${
+                          isSelected
+                            ? "bg-blue-600/20 border-blue-500/30"
+                            : "bg-white/[0.03] border-white/[0.07] hover:border-white/15"
+                        }`}
+                      >
+                        {item.icon}
+                        <div>
+                          <p className="text-xs font-semibold text-white">{item.label}</p>
+                          <p className="text-[10px] text-white/40">{item.sub}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -439,7 +394,7 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
           />
 
           <p className="text-xs text-white/30 mt-3">
-            {selectedScene ?? selectedStudio} · {selectedRatio}
+            {selectedRatio}
           </p>
           </div>
         </div>
@@ -450,7 +405,7 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
             className="w-[260px] border-l border-white/[0.07] flex flex-col flex-shrink-0"
             style={{ background: "#0d0f14" }}
           >
-            {/* Sidebar header: collapse | tabs | ... */}
+            {/* Sidebar header */}
             <div className="flex items-center px-2 py-2 flex-shrink-0 border-b border-white/[0.04]">
               <button
                 onClick={() => setRightOpen(false)}
@@ -459,84 +414,50 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
               >
                 <RightSidebarIcon />
               </button>
-              {/* Tabs */}
-              <div className="flex items-center overflow-x-auto gap-0.5 flex-1 ml-1" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
-                {TABS.map((tab) => (
+
+              {activeMedia ? (
+                /* Media panel header */
+                <div className="flex items-center justify-between flex-1 ml-2">
+                  <span className="text-xs font-semibold text-white capitalize">{activeMedia}</span>
                   <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`text-xs font-medium px-2.5 py-1.5 whitespace-nowrap transition-colors rounded-lg flex-shrink-0 ${
-                      activeTab === tab
-                        ? "text-white border-b-2 border-blue-400"
-                        : "text-white/40 hover:text-white/70"
-                    }`}
+                    onClick={() => setActiveMedia(null)}
+                    className="p-1 rounded-lg text-white/30 hover:text-white/60 transition-colors"
+                    aria-label="Close media panel"
                   >
-                    {tab}
+                    <XIcon size={10} />
                   </button>
-                ))}
-              </div>
-              <button className="p-1.5 text-white/30 hover:text-white/60 transition-colors flex-shrink-0 ml-1" aria-label="More options">
-                <DotsIcon />
-              </button>
+                </div>
+              ) : (
+                /* Normal tabs */
+                <>
+                  <div className="flex items-center overflow-x-auto gap-0.5 flex-1 ml-1" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
+                    {TABS.map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`text-xs font-medium px-2.5 py-1.5 whitespace-nowrap transition-colors rounded-lg flex-shrink-0 ${
+                          activeTab === tab
+                            ? "text-white border-b-2 border-blue-400"
+                            : "text-white/40 hover:text-white/70"
+                        }`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                  <button className="p-1.5 text-white/30 hover:text-white/60 transition-colors flex-shrink-0 ml-1" aria-label="More options">
+                    <DotsIcon />
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Tab content */}
+            {/* Tab / media content */}
             <div
               className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5"
               style={{ scrollbarWidth: "none" } as React.CSSProperties}
             >
-              {/* Background tab */}
-              {activeTab === "Background" && (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Studio</p>
-                    <div className="flex flex-col gap-1.5">
-                      {STUDIOS.map((s) => (
-                        <button
-                          key={s.name}
-                          onClick={() => { setSelectedStudio(s.name); setSelectedScene(null); }}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
-                            selectedStudio === s.name && selectedScene === null
-                              ? "border-blue-400/50 bg-blue-500/10"
-                              : "border-white/[0.07] hover:border-white/15 bg-white/[0.02]"
-                          }`}
-                        >
-                          <span className="w-6 h-6 rounded-full border border-white/20 flex-shrink-0" style={{ background: s.color }} />
-                          <span>
-                            <span className="text-xs font-semibold text-white block">{s.name}</span>
-                            <span className="text-[10px] text-white/40">{s.desc}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Scenes</p>
-                    <div className="flex flex-col gap-1.5">
-                      {SCENES.map((s) => (
-                        <button
-                          key={s.name}
-                          onClick={() => setSelectedScene(s.name)}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
-                            selectedScene === s.name
-                              ? "border-blue-400/50 bg-blue-500/10"
-                              : "border-white/[0.07] hover:border-white/15 bg-white/[0.02]"
-                          }`}
-                        >
-                          <span className="w-6 h-6 rounded-full border border-white/20 flex-shrink-0" style={{ background: s.color }} />
-                          <span>
-                            <span className="text-xs font-semibold text-white block">{s.name}</span>
-                            <span className="text-[10px] text-white/40">{s.desc}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Position tab */}
-              {activeTab === "Position" && (
+              {activeMedia === "image" && (
                 <>
                   <div className="flex flex-col gap-2">
                     <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Placement</p>
@@ -547,109 +468,91 @@ export default function CampaignEditor({ campaignName, onBack }: CampaignEditorP
                     <PillSelector options={SIZES} value={selectedSize} onChange={setSelectedSize} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Depth</p>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-white/40 w-8 text-right">Flat</span>
-                      <input type="range" min={0} max={100} value={depthValue} onChange={(e) => setDepthValue(Number(e.target.value))} className="flex-1 accent-blue-500 cursor-pointer" />
-                      <span className="text-[10px] text-white/40 w-12">3D angle</span>
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Tweaks</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TWEAKS.map((opt) => {
+                        const on = selectedTweaks.includes(opt);
+                        return (
+                          <button key={opt} onClick={() => toggleTweak(opt)}
+                            className={`rounded-full px-3 py-1 text-xs border transition-colors ${on ? "bg-blue-600/40 text-blue-300 border-blue-400/40" : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60"}`}>
+                            {opt}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </>
               )}
 
-              {/* Text tab */}
-              {activeTab === "Text" && (
+              {activeMedia === "video" && (
                 <>
                   <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Show on Ad</p>
-                    <div className="flex flex-col gap-2.5">
-                      {[
-                        { label: "Brand name", value: showBrandName, set: setShowBrandName },
-                        { label: "Tagline",    value: showTagline,   set: setShowTagline   },
-                        { label: "Price / CTA",value: showPriceCTA,  set: setShowPriceCTA  },
-                      ].map(({ label, value, set }) => (
-                        <label key={label} className="flex items-center gap-2.5 cursor-pointer">
-                          <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} className="accent-blue-500 w-4 h-4 cursor-pointer" />
-                          <span className="text-sm text-white/60">{label}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Duration</p>
+                    <PillSelector options={["15s", "30s", "60s"]} value="15s" onChange={() => {}} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Text Position</p>
-                    <PlacementGrid value={textPlacement} onChange={setTextPlacement} />
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Format</p>
+                    <PillSelector options={["Landscape", "Portrait", "Square"]} value="Landscape" onChange={() => {}} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Font Style</p>
-                    <PillSelector options={FONT_STYLES} value={selectedFontStyle} onChange={setSelectedFontStyle} />
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Style</p>
+                    <PillSelector options={["Dynamic", "Cinematic", "Minimal"]} value="Dynamic" onChange={() => {}} />
                   </div>
                 </>
               )}
 
-              {/* Style tab */}
-              {activeTab === "Style" && (
+              {activeMedia === "audio" && (
                 <>
                   <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Ad Personality</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {PERSONALITIES.map((p) => (
-                        <button
-                          key={p.name}
-                          onClick={() => setSelectedPersonality(p.name)}
-                          className={`px-3 py-2.5 rounded-xl border text-left transition-colors ${
-                            selectedPersonality === p.name
-                              ? "border-blue-400/50 bg-blue-500/10"
-                              : "border-white/[0.07] bg-white/[0.02] hover:border-white/15"
-                          }`}
-                        >
-                          <p className="text-xs font-semibold text-white leading-snug">{p.name}</p>
-                          <p className="text-[10px] text-white/40 mt-0.5 leading-snug">{p.desc}</p>
-                        </button>
-                      ))}
-                    </div>
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Duration</p>
+                    <PillSelector options={["15s", "30s", "60s"]} value="30s" onChange={() => {}} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Lighting</p>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-white/40 whitespace-nowrap">Soft &amp; natural</span>
-                      <input type="range" min={0} max={100} value={lightingValue} onChange={(e) => setLightingValue(Number(e.target.value))} className="flex-1 accent-blue-500 cursor-pointer" />
-                      <span className="text-[10px] text-white/40 whitespace-nowrap">Dramatic</span>
-                    </div>
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Mood</p>
+                    <PillSelector options={["Upbeat", "Calm", "Dramatic", "Playful", "Sad", "Melodic"]} value="Upbeat" onChange={() => {}} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Instruments</p>
+                    <PillSelector options={["Guitar", "Piano", "Synth", "Drums", "Vocals"]} value="Piano" onChange={() => {}} />
                   </div>
                 </>
               )}
 
-              {/* Tweaks tab */}
-              {activeTab === "Tweaks" && (
+              {!activeMedia && (
                 <>
-                  {TWEAKS.map((section) => (
-                    <div key={section.label} className="flex flex-col gap-2">
-                      <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">{section.label}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {section.options.map((opt) => {
-                          const on = selectedTweaks.includes(opt);
-                          return (
-                            <button
-                              key={opt}
-                              onClick={() => toggleTweak(opt)}
-                              className={`rounded-full px-3 py-1 text-xs border transition-colors ${
-                                on
-                                  ? "bg-blue-600/40 text-blue-300 border-blue-400/40"
-                                  : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60"
-                              }`}
-                            >
-                              {opt}
-                            </button>
-                          );
-                        })}
+                  {/* Position tab */}
+                  {activeTab === "Position" && (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Placement</p>
+                        <PlacementGrid value={placement} onChange={setPlacement} />
                       </div>
+                      <div className="flex flex-col gap-2">
+                        <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Size</p>
+                        <PillSelector options={SIZES} value={selectedSize} onChange={setSelectedSize} />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Tweaks tab */}
+                  {activeTab === "Tweaks" && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {TWEAKS.map((opt) => {
+                        const on = selectedTweaks.includes(opt);
+                        return (
+                          <button key={opt} onClick={() => toggleTweak(opt)}
+                            className={`rounded-full px-3 py-1 text-xs border transition-colors ${on ? "bg-blue-600/40 text-blue-300 border-blue-400/40" : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white/60"}`}>
+                            {opt}
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
+                  )}
                 </>
               )}
             </div>
 
-            {/* Right sidebar footer */}
+            {/* Footer */}
             <div className="flex-shrink-0 px-4 py-4 border-t border-white/[0.05]">
               <button className="w-full py-3 rounded-xl text-sm font-semibold text-white border border-white/20 hover:border-white/40 flex items-center justify-center gap-2 transition-colors">
                 Regenerate with changes

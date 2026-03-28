@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NewCampaignModal from "./NewCampaignModal";
 import ConceptDirectionScreen from "./ConceptDirectionScreen";
 import CampaignEditor from "./CampaignEditor";
@@ -56,30 +56,126 @@ const ALL_CAMPAIGNS: Campaign[] = [
   { id: "5", name: "Holiday Promo 2024",    assets: "5 images · 1 jingle",            timeAgo: "3 days ago",  status: "draft",      previewBg: "bg-[#1a0808]", thumbBg: "bg-[#8a2a2a]", thumbShape: "circle", sortOrder: 4 },
 ];
 
-function CampaignCard({ campaign, onCardClick }: { campaign: Campaign; onCardClick: (name: string) => void }) {
+function CampaignCard({ campaign, onCardClick, onDelete, onRename }: { campaign: Campaign; onCardClick: (name: string) => void; onDelete: (id: string) => void; onRename: (id: string, name: string) => void }) {
   const status = STATUS_STYLES[campaign.status];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(campaign.name);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  function commitRename() {
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== campaign.name) onRename(campaign.id, trimmed);
+    setRenaming(false);
+  }
+
   return (
-    <button
-      onClick={() => onCardClick(campaign.name)}
-      className="group flex flex-col rounded-2xl overflow-hidden border border-white/[0.07] hover:border-blue-400/30 transition-all duration-200 text-left w-full"
-      style={{ background: "rgba(255,255,255,0.02)" }}
-    >
-      <div className={`relative w-full h-44 flex items-center justify-center ${campaign.previewBg}`}>
-        <span className={`absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-full ${status.className}`}>
-          {status.label}
-        </span>
-        {campaign.thumbShape === "rect" ? (
-          <div className={`w-20 h-24 rounded-xl ${campaign.thumbBg}`} />
-        ) : (
-          <div className={`w-20 h-20 rounded-full ${campaign.thumbBg}`} />
-        )}
-      </div>
-      <div className="px-4 py-4">
-        <p className="text-base font-bold text-white mb-1 group-hover:text-blue-300 transition-colors">{campaign.name}</p>
-        <p className="text-sm text-white/40 mb-1">{campaign.assets}</p>
-        <p className="text-xs text-white/25">{campaign.timeAgo}</p>
-      </div>
-    </button>
+    <div className="relative group">
+      <button
+        onClick={() => onCardClick(campaign.name)}
+        className="group/card flex flex-col rounded-2xl border border-white/[0.07] hover:border-blue-400/30 transition-all duration-200 text-left w-full"
+        style={{ background: "rgba(255,255,255,0.02)" }}
+      >
+        <div className={`relative w-full h-44 flex items-center justify-center rounded-t-2xl ${campaign.previewBg}`}>
+          <span className={`absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-full ${status.className}`}>
+            {status.label}
+          </span>
+          {campaign.thumbShape === "rect" ? (
+            <div className={`w-20 h-24 rounded-xl ${campaign.thumbBg}`} />
+          ) : (
+            <div className={`w-20 h-20 rounded-full ${campaign.thumbBg}`} />
+          )}
+        </div>
+        <div className="px-4 py-4">
+          {/* Name row with 3-dot menu */}
+          <div ref={menuRef} className="relative flex items-center justify-between gap-1 mb-1">
+            {renaming ? (
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename();
+                  if (e.key === "Escape") { setRenameValue(campaign.name); setRenaming(false); }
+                  e.stopPropagation();
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="text-base font-bold text-white bg-white/10 border border-blue-400/40 rounded-lg px-2 py-0.5 outline-none flex-1 min-w-0"
+              />
+            ) : (
+              <p className="text-base font-bold text-white group-hover/card:text-blue-300 transition-colors truncate flex-1 min-w-0">{campaign.name}</p>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+              className="w-6 h-6 rounded-md text-white/0 group-hover/card:text-white/40 hover:!text-white hover:bg-white/10 flex items-center justify-center flex-shrink-0 transition-colors"
+              aria-label="Campaign options"
+            >
+              <svg width="3" height="11" viewBox="0 0 4 16" fill="currentColor">
+                <circle cx="2" cy="2"  r="1.5" />
+                <circle cx="2" cy="8"  r="1.5" />
+                <circle cx="2" cy="14" r="1.5" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div
+                className="absolute top-7 right-0 w-36 rounded-xl border border-white/10 shadow-2xl overflow-hidden z-20"
+                style={{ background: "#1c2030" }}
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenaming(true); setRenameValue(campaign.name); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2.5"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Rename
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2.5"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download
+                </button>
+                <div className="h-px bg-white/[0.06] mx-3" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(campaign.id); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors flex items-center gap-2.5"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-white/40 mb-1">{campaign.assets}</p>
+          <p className="text-xs text-white/25">{campaign.timeAgo}</p>
+        </div>
+      </button>
+    </div>
   );
 }
 
@@ -92,6 +188,7 @@ interface GeminiDashboardProps {
 export default function GeminiDashboard({ userName = "User" }: GeminiDashboardProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [campaigns, setCampaigns] = useState(ALL_CAMPAIGNS);
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [pendingCampaign, setPendingCampaign] = useState<{ businessName: string; productName: string } | null>(null);
   const [editorCampaign, setEditorCampaign] = useState<string | null>(null);
@@ -106,7 +203,7 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
     );
   }
 
-  const sortedCampaigns = [...ALL_CAMPAIGNS].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sortedCampaigns = [...campaigns].sort((a, b) => a.sortOrder - b.sortOrder);
 
   const filtered = query.trim()
     ? sortedCampaigns.filter((c) =>
@@ -201,6 +298,8 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
                 key={c.id}
                 campaign={c}
                 onCardClick={(name) => setEditorCampaign(name)}
+                onDelete={(id) => setCampaigns((prev) => prev.filter((x) => x.id !== id))}
+                onRename={(id, name) => setCampaigns((prev) => prev.map((x) => x.id === id ? { ...x, name } : x))}
               />
             ))}
           </div>
