@@ -3,8 +3,21 @@ from services.gemini_client import client, rate_limiter
 from config import MODEL_LYRIA
 
 
+UNDERSCORE_INSTRUCTION = """This must be SUBTLE BACKGROUND UNDERSCORE music for a video ad — NOT a full song, NOT a jingle, NOT a melody-forward track.
+
+Requirements:
+- Sparse and minimal — leave space for the video's own sound effects and ambient audio
+- No vocals, no lyrics, no humming
+- No dominant melody line — use pads, textures, and atmosphere instead
+- Low-mid volume energy — this sits BEHIND the video, not on top of it
+- Gentle build: start very quiet, swell subtly around the middle, resolve softly at the end
+- Think: film score underscore, not Spotify track
+
+"""
+
+
 def generate_jingle(prompt: str) -> dict:
-    """Generate a 30-second jingle with Lyria 3 Clip.
+    """Generate a 30-second background underscore with Lyria 3 Clip.
 
     Args:
         prompt: Music style description, e.g. "Dark Synthwave, 100 BPM, heavy bass".
@@ -13,11 +26,13 @@ def generate_jingle(prompt: str) -> dict:
         {"audio_data": bytes, "duration_seconds": 30, "format": "wav",
          "text_parts": list[str]}
     """
+    full_prompt = f"{UNDERSCORE_INSTRUCTION}{prompt}"
+
     try:
         rate_limiter.check(MODEL_LYRIA)
         response = client.models.generate_content(
             model=MODEL_LYRIA,
-            contents=prompt,
+            contents=full_prompt,
             config=types.GenerateContentConfig(
                 response_modalities=["AUDIO", "TEXT"],
             ),

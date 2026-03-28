@@ -104,12 +104,33 @@ export default function CampaignEditor({
   const hasStarted = useRef(false);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Fetch completed campaign data
+  // Fetch completed campaign data — maps from Firestore nested assets shape
   const fetchCampaignData = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/campaigns/${campaignId}`);
       if (!res.ok) throw new Error(`Failed to fetch campaign: ${res.status}`);
-      const data: CampaignData = await res.json();
+      const raw = await res.json();
+
+      // Server stores assets as nested objects, map to flat strings (filenames)
+      const assets = raw.assets || {};
+      const data: CampaignData = {
+        id: raw.id || campaignId,
+        name: raw.productName || raw.businessName || "",
+        status: raw.status,
+        images: (assets.images || []).map((img: any) =>
+          typeof img === "string" ? img : (img.path || "")
+        ),
+        video: typeof assets.video === "string"
+          ? assets.video
+          : assets.video?.path || undefined,
+        jingle: typeof assets.jingle === "string"
+          ? assets.jingle
+          : assets.jingle?.path || undefined,
+        final_video: typeof assets.composedVideo === "string"
+          ? assets.composedVideo
+          : assets.composedVideo?.path || undefined,
+        error: raw.errorMessage,
+      };
       setCampaignData(data);
       setPhase("complete");
     } catch (err: any) {
@@ -118,11 +139,40 @@ export default function CampaignEditor({
     }
   }, [campaignId]);
 
+  // Check campaign status via REST (fallback when SSE misses events)
+  const checkCampaignStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/campaigns/${campaignId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.status === "complete") {
+        fetchCampaignData();
+        return true;
+      }
+      if (data.status === "error") {
+        setErrorText(data.errorMessage || "Generation failed");
+        setPhase("error");
+        return true;
+      }
+    } catch { /* ignore, keep listening */ }
+    return false;
+  }, [campaignId, fetchCampaignData]);
+
   // Connect SSE for progress updates
   const connectSSE = useCallback(() => {
-    const url = `${API_BASE}/api/campaigns/${campaignId}/stream?token=`;
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "";
+    const url = `${API_BASE}/api/campaigns/${campaignId}/stream?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
     eventSourceRef.current = es;
+
+    // On (re)connect, check if campaign already finished while disconnected
+    es.onopen = async () => {
+      const done = await checkCampaignStatus();
+      if (done) {
+        es.close();
+        eventSourceRef.current = null;
+      }
+    };
 
     es.addEventListener("status", (e: MessageEvent) => {
       try {
@@ -151,6 +201,7 @@ export default function CampaignEditor({
     });
 
     es.addEventListener("error", (e: any) => {
+      // Server-sent error event (has data)
       if (e.data) {
         try {
           const data = JSON.parse(e.data);
@@ -161,11 +212,14 @@ export default function CampaignEditor({
         setPhase("error");
         es.close();
         eventSourceRef.current = null;
+      } else if (es.readyState === EventSource.CLOSED) {
+        // Connection permanently closed — fall back to polling
+        checkCampaignStatus();
       }
     });
 
     return es;
-  }, [campaignId, fetchCampaignData]);
+  }, [campaignId, fetchCampaignData, checkCampaignStatus]);
 
   // Trigger generation on mount
   useEffect(() => {
@@ -239,7 +293,20 @@ export default function CampaignEditor({
     };
   }, [campaignId, files, logo, directionIndex, imageCount, connectSSE]);
 
-  // Derive URLs from campaign data
+  // Fallback: poll campaign status every 15s in case SSE misses events
+  useEffect(() => {
+    if (phase !== "generating") return;
+    const interval = setInterval(async () => {
+      const done = await checkCampaignStatus();
+      if (done && eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [phase, checkCampaignStatus]);
+
+  // Derive image URLs from campaign data
   const imageUrls: string[] = [];
   if (campaignData?.images) {
     campaignData.images.forEach((img) => {

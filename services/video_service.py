@@ -5,7 +5,28 @@ from google.genai import types
 from services.gemini_client import client, rate_limiter
 from config import MODEL_VEO, GEMINI_API_KEY
 
-MAX_POLL_ATTEMPTS = 18  # 18 * 10s = 3 minute timeout
+MAX_POLL_ATTEMPTS = 24  # 24 * 10s = 4 minute timeout
+POLL_API_BASE = "https://generativelanguage.googleapis.com"
+
+
+VIDEO_STRUCTURE = """
+MANDATORY 3-ACT STRUCTURE for this 8-second video ad:
+
+SECONDS 0-2 — THE HOOK (scroll-stopper):
+Dramatic, visually arresting opening. Fast camera movement, unexpected angle, or striking visual. NO product yet, NO logo yet. Just something that makes someone stop scrolling — a whip pan across the environment, a close-up of texture with rack focus, light catching particles in the air, or a dramatic reveal building anticipation.
+
+SECONDS 3-5 — THE HERO (product reveal):
+Product appears front and center. Brand label clearly visible, facing camera. The environment from the art direction surrounds the product as context. Smooth camera movement — slow push-in, gentle orbit, or steady tracking shot. This is the "oh, it's an ad for THIS" moment. Hold long enough for the viewer to register the brand.
+
+SECONDS 6-8 — THE SETTLE (locked-off beauty shot):
+Camera arrives at its final position and HOLDS COMPLETELY STILL on the product. No movement in the last 2 seconds. The frame should feel like a print ad — a locked-off beauty shot that could be a poster. All motion stops. The product is perfectly composed, branding visible, environment as backdrop.
+
+Optional: use a subtle light shift in the final moments — the ambient light slowly warms and the background softly dims, drawing focus to the product. This creates a natural visual resolution without camera movement.
+
+NEVER end with a zoom, whip pan, orbit, or ANY camera motion still in progress. The video must feel complete, not cut off. A static final frame always feels intentional.
+
+PACING: The energy and movement happens in seconds 0-5. The last 3 seconds are the landing — steady, composed, intentional. Transitions between acts should feel like natural camera movement that decelerates into stillness.
+"""
 
 
 def generate_video(
@@ -24,6 +45,19 @@ def generate_video(
     Returns:
         {"video_data": bytes, "duration_seconds": 8, "format": "mp4"}
     """
+    # Wrap the art direction's veo prompt with the 3-act structure
+    full_prompt = f"""{VIDEO_STRUCTURE}
+
+SCENE DIRECTION (from art direction): {prompt}
+
+DURATION: Exactly 8 seconds. The video MUST use all 8 seconds — do not end early. The final frame should feel like a deliberate ending, not an abrupt cutoff.
+
+AUDIO: Veo generates synchronized audio natively. Generate ambient environmental sounds ONLY — match the scene (e.g. wind, waves, city hum, clinking glasses, footsteps). NO voiceover, NO dialogue, NO spoken words, NO music. All voiceover and music are handled by Lyria separately.
+
+ANTI-AI REALISM: Shot on anamorphic widescreen. Subtle film grain, minor lens breathing on focus pulls, micro handheld jitter. Materials have real texture — wet surfaces reflect, metal glints, fabric has weave. Never hyper-realistic, never 8K, never perfect.
+
+Avoid: motion blur, face distortion, warping, morphing, duplicate objects, floating objects, plastic skin, oversaturation, over-sharpening"""
+
     try:
         rate_limiter.check(MODEL_VEO)
 
@@ -45,33 +79,71 @@ def generate_video(
 
         operation = client.models.generate_videos(
             model=MODEL_VEO,
-            prompt=prompt,
+            prompt=full_prompt,
             config=config,
         )
         print(f"[Veo] Job submitted. Polling...")
 
-        # Phase 2: Poll
+        # Phase 2: Poll via direct HTTP (SDK operations.get() hangs)
+        op_name = operation.name
+        print(f"[Veo] Operation: {op_name}")
+        poll_url = f"{POLL_API_BASE}/v1beta/{op_name}"
+
+        video_uri = None
         for attempt in range(1, MAX_POLL_ATTEMPTS + 1):
-            if operation.done:
-                break
-            print(f"[Veo] Polling {attempt}/{MAX_POLL_ATTEMPTS}...")
             time.sleep(10)
-            operation = client.operations.get(operation)
-        else:
-            if not operation.done:
-                raise RuntimeError(
-                    f"Veo timed out after {MAX_POLL_ATTEMPTS * 10}s. "
-                    "Video generation did not complete."
+            print(f"[Veo] Polling {attempt}/{MAX_POLL_ATTEMPTS}...")
+            try:
+                poll_resp = requests.get(
+                    poll_url,
+                    params={"key": GEMINI_API_KEY},
+                    timeout=15,
                 )
+                poll_resp.raise_for_status()
+                poll_data = poll_resp.json()
+
+                if poll_data.get("done"):
+                    print(f"[Veo] Generation complete!")
+                    videos = (poll_data.get("response", {})
+                              .get("generateVideoResponse", {})
+                              .get("generatedSamples", []))
+                    if not videos:
+                        # Try alternate response shape
+                        videos = (poll_data.get("response", {})
+                                  .get("generatedVideos", []))
+                    if not videos:
+                        raise RuntimeError(
+                            f"Veo completed but returned no videos. "
+                            f"Response keys: {list(poll_data.get('response', {}).keys())}"
+                        )
+                    video_uri = (videos[0].get("video", {}).get("uri")
+                                 or videos[0].get("uri"))
+                    if not video_uri:
+                        raise RuntimeError(
+                            f"Veo video has no URI. Video object: {videos[0]}"
+                        )
+                    break
+
+                if poll_data.get("error"):
+                    raise RuntimeError(
+                        f"Veo error: {poll_data['error']}"
+                    )
+
+            except requests.exceptions.Timeout:
+                print(f"[Veo] Poll {attempt} timed out — retrying...")
+                continue
+            except requests.exceptions.RequestException as req_err:
+                print(f"[Veo] Poll {attempt} HTTP error: {req_err} — retrying...")
+                continue
+
+        if not video_uri:
+            raise RuntimeError(
+                f"Veo timed out after {MAX_POLL_ATTEMPTS * 10}s. "
+                "Video generation did not complete."
+            )
 
         # Phase 3: Download (streaming to handle large files)
-        if not operation.response or not operation.response.generated_videos:
-            raise RuntimeError(
-                f"Veo completed but returned no videos. "
-                f"Response: {operation.response}"
-            )
-        video_uri = operation.response.generated_videos[0].video.uri
-        print(f"[Veo] Video ready. Downloading from: {video_uri[:80]}...")
+        print(f"[Veo] Downloading from: {video_uri[:100]}...")
 
         dl_response = requests.get(
             video_uri,

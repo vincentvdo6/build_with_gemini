@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import os
+import time
 import traceback
 from pathlib import Path
 
@@ -30,12 +31,17 @@ def _require_campaign(campaign_id: str, user: dict) -> dict:
 
 
 def _save_asset(campaign_id: str, filename: str, data: bytes) -> str:
-    """Save generated asset to disk and return its path."""
+    """Save generated asset to disk and return the filename only (not full path)."""
     out_dir = os.path.join("outputs", campaign_id)
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, filename)
     Path(path).write_bytes(data)
-    return path
+    return filename
+
+
+def _asset_disk_path(campaign_id: str, filename: str) -> str:
+    """Get the full disk path for a saved asset."""
+    return os.path.join("outputs", campaign_id, filename)
 
 
 # ---------- Analyze ----------
@@ -257,6 +263,8 @@ def _run_pipeline(
     assets: dict = {"images": [], "video": None, "jingle": None, "composedVideo": None}
 
     try:
+        # Give SSE clients time to connect before sending events
+        time.sleep(2.0)
         sse_manager.send(campaign_id, "status", "Generating campaign assets...")
 
         # Prepare prompts
@@ -283,7 +291,7 @@ def _run_pipeline(
                     series_total=image_count,
                 )
                 path = _save_asset(campaign_id, f"image_{index}.png", img_data)
-                return {"path": path, "base64": base64.b64encode(img_data).decode(), "format": "1:1"}
+                return {"path": path, "format": "1:1"}
 
             img_futures = [pool.submit(_gen_image, i) for i in range(1, image_count + 1)]
 
@@ -320,9 +328,11 @@ def _run_pipeline(
 
         # --- Merge (needs both video + jingle done) ---
         sse_manager.send(campaign_id, "status", "Composing final video...")
-        final_path = os.path.join("outputs", campaign_id, "final_ad.mp4")
-        merge_audio_video(assets["video"]["path"], assets["jingle"]["path"], final_path)
-        assets["composedVideo"] = {"path": final_path, "duration": 8}
+        final_disk_path = _asset_disk_path(campaign_id, "final_ad.mp4")
+        video_disk_path = _asset_disk_path(campaign_id, assets["video"]["path"])
+        jingle_disk_path = _asset_disk_path(campaign_id, assets["jingle"]["path"])
+        merge_audio_video(video_disk_path, jingle_disk_path, final_disk_path)
+        assets["composedVideo"] = {"path": "final_ad.mp4", "duration": 8}
 
         update_campaign(campaign_id, {
             "status": "complete",

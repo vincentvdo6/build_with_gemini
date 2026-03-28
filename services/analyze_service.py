@@ -27,7 +27,7 @@ Return a JSON object with this exact structure:
       "prompt_fragments": {
         "nano_banana": "Detailed image generation prompt for this direction — include lighting, composition, setting, props, mood, and the product in context",
         "veo": "Video prompt following ALL rules below. MUST include an exact visual description of the product (color, shape, packaging type, brand name, label details).",
-        "lyria": "Music genre, BPM, specific instruments, mood, energy level"
+        "lyria": "Background underscore music — genre, BPM, specific instruments (pads/textures preferred over melodies), mood, energy level. Must be subtle and minimal. End with: 'Instrumental for the first 22 seconds. In the final 8 seconds, a [voice type matching art direction tone] speaks: [brand_name]. [product_name].' The delivery is confident, unhurried."
       }
     }
   ]
@@ -62,11 +62,11 @@ HUMAN PRESENCE: People in the scene ARE encouraged (skateboarding, walking, work
 PACING: This is social media content (TikTok, Reels, YouTube Shorts). Every prompt must use fast, dynamic energy: "fast-paced", "quick cuts", "dynamic camera movement". NEVER use "slow pan", "slow motion", or "gentle movement". Include specific timing cues within the 8-second window.
 
 8-SECOND STRUCTURE: Every video must follow this arc:
-- Seconds 0-2: HOOK — dramatic angle, fast movement, attention grab
-- Seconds 3-5: HERO — product front and center, branding visible
-- Seconds 6-8: CLOSE — energy exit (zoom, whip pan, dynamic outro)
+- Seconds 0-2: HOOK — dramatic angle, fast movement, attention grab. No product yet.
+- Seconds 3-5: HERO — product front and center, branding visible. Smooth camera.
+- Seconds 6-8: SETTLE — camera arrives at its final position and HOLDS COMPLETELY STILL on the product. No movement in the last 2 seconds. The frame should feel like a print ad — a locked-off beauty shot that could be a poster. NEVER end with a zoom, whip pan, or any camera motion still in progress. The video must feel complete, not cut off. Optional: use a subtle light shift (warming, dimming background) to create a natural visual resolution in the final moments.
 
-CAMERA TECHNIQUES: Use rapid dolly zooms, push-ins, whip pans between angles, dynamic tracking shots, light/shadow transitions, environmental particles (water spray, sparks, dust, confetti) that exist in the scene but don't physically interact with the product. AVOID extreme close-ups and awkward or unnatural zoom-ins on the product.
+CAMERA TECHNIQUES: Use rapid dolly zooms, push-ins, whip pans between angles, dynamic tracking shots, light/shadow transitions, environmental particles (water spray, sparks, dust, confetti) that exist in the scene but don't physically interact with the product. All dynamic movement MUST happen in seconds 0-5. Seconds 6-8 are locked-off and still. AVOID extreme close-ups and awkward or unnatural zoom-ins on the product.
 
 PRODUCT VISIBILITY: The product's front branding and logo must be clearly visible during the hero shot (seconds 3-5). Never show the back or nutrition facts as the primary face.
 
@@ -78,7 +78,17 @@ ANTI-AI REALISM: Every veo_prompt_fragment must include:
 
 NEGATIVE CUES: Append to every veo_prompt_fragment: "Avoid: motion blur, face distortion, warping, morphing, duplicate objects, floating objects, plastic skin, oversaturation, over-sharpening"
 
-AUDIO DIRECTION: Specify audio separately at the end of the veo prompt: "Audio: [ambient sounds relevant to the scene, product-specific sounds like clinks/crunches/pours, environmental noise]". Veo generates synchronized audio natively — guide it or it guesses randomly.
+AUDIO IN VEO: Veo should generate ambient environmental sounds ONLY. No voiceover, no dialogue, no spoken words. Examples: "Audio: waves crashing, distant seagulls, wind" or "Audio: bar ambiance, glasses clinking, muffled conversation." All voiceover and music is handled by Lyria separately.
+
+LYRIA VOICEOVER: Every lyria_prompt_fragment must end with a voiceover instruction:
+
+"Instrumental for the first 22 seconds. In the final 8 seconds, a [voice type] speaks: '{brand_name}. {product_name}.' The delivery is confident, unhurried, with a brief pause between the brand name and product name."
+
+Voice type must match the art direction tone:
+- Warm/nostalgic/outdoor direction → deep, warm male voice
+- Refined/urban/premium direction → smooth female voice with slight warmth
+
+ONLY include a made-up slogan after the brand/product name if it absolutely fits — if there is even the slightest doubt, say ONLY the brand name and product name.
 
 ## Additional rules:
 - Extract dominant colors from the actual product image, not guessed

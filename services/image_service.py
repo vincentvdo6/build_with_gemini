@@ -70,16 +70,41 @@ def apply_art_direction(
     # Build thematic continuity instruction for series
     series_instruction = ""
     if series_total > 1 and series_index > 0:
-        moment_hints = [
-            "a wide establishing shot showing the full scene",
-            "a close-up detail shot focusing on the product's texture and label",
-            "an atmospheric mood shot with dramatic lighting",
-            "a lifestyle context shot showing the product in use",
-            "an artistic angle with creative composition",
+        # Each image tells a different chapter of the same story
+        story_beats = [
+            {
+                "role": "The Hero Shot",
+                "desc": "Product front and center, perfectly lit, label fully visible. The definitive product portrait — this is the one that goes on the website.",
+                "camera": "straight-on or slight 3/4 angle, shallow depth of field, product fills 60% of frame",
+            },
+            {
+                "role": "The Environment Shot",
+                "desc": "Product placed naturally in its world — on a surface, in a setting, surrounded by contextual props. Shows WHERE this product lives and WHO it's for.",
+                "camera": "wider framing, product at 30-40% of frame, rich environmental detail, leading lines draw eye to product",
+            },
+            {
+                "role": "The Detail Shot",
+                "desc": "Intimate close-up of one compelling detail — the texture of the packaging, condensation drops, a pour, steam rising, the cap, the label typography. Tactile and sensory.",
+                "camera": "macro or tight crop, extreme shallow DOF, dramatic side lighting to emphasize texture",
+            },
+            {
+                "role": "The Lifestyle Shot",
+                "desc": "The product in a moment of use or desire — on a table at golden hour, mid-pour into a glass, beside a plate of food, in someone's hand (no face). Aspirational and emotional.",
+                "camera": "candid editorial feel, slightly imperfect framing, warm natural light, bokeh background",
+            },
+            {
+                "role": "The Dramatic Shot",
+                "desc": "Unexpected angle or bold composition — bird's eye, extreme low angle, silhouette against light, reflection in a surface, or surrounded by ingredients/materials. The scroll-stopper.",
+                "camera": "unusual perspective, strong geometric composition, high contrast lighting, negative space",
+            },
         ]
-        hint = moment_hints[(series_index - 1) % len(moment_hints)]
+        beat = story_beats[(series_index - 1) % len(story_beats)]
         series_instruction = f"""
-SERIES CONTINUITY: This is image {series_index} of {series_total} in a campaign series. All images share the same color palette, lighting style, and overall mood — but each shows a DIFFERENT moment or angle. For this image, create {hint}. Vary the camera angle and composition from the other shots while keeping the visual identity cohesive."""
+CAMPAIGN SERIES — Image {series_index} of {series_total}: "{beat['role']}"
+{beat['desc']}
+Camera direction: {beat['camera']}
+
+CRITICAL: This image must look like it belongs to the SAME campaign as the others (same color palette, same lighting temperature, same visual world) but must be a COMPLETELY DIFFERENT composition and moment. Do NOT just re-angle the same shot — tell a different part of the product's story."""
 
     # Build the generation prompt
     prompt = f"""Generate a single advertising photograph using the EXACT product shown in the reference photos above. Do NOT invent or hallucinate a different product — use the real one.

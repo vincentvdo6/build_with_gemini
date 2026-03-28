@@ -7,19 +7,18 @@ def merge_audio_video(
     audio_path: str,
     output_path: str,
     audio_offset: int = 4,
-    music_volume: float = 0.3,
 ) -> str:
-    """Merge Lyria audio onto Veo video with ffmpeg.
+    """Replace Veo video's audio track with Lyria audio.
 
-    Layers the jingle under the video's existing audio (if any).
-    Skips into the jingle to avoid the quiet intro. Trims to video length.
+    Veo handles visuals only (ambient SFX are now in Lyria's output).
+    Lyria handles ALL audio — underscore music, ambient feel, and
+    brand voiceover in the final seconds. No mixing needed.
 
     Args:
         video_path: Path to Veo MP4 (8 seconds).
-        audio_path: Path to Lyria WAV (30 seconds).
-        output_path: Where to save the merged MP4.
-        audio_offset: Seconds to skip into the jingle (default 4, skips intro).
-        music_volume: Jingle volume relative to video audio (default 0.3).
+        audio_path: Path to Lyria WAV (30 seconds — music + voiceover).
+        output_path: Where to save the final MP4.
+        audio_offset: Seconds to skip into the Lyria track (default 4, skips intro).
 
     Returns:
         output_path on success.
@@ -31,20 +30,8 @@ def merge_audio_video(
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
+    # Video from Veo, audio ONLY from Lyria — no mixing
     cmd = [
-        "ffmpeg", "-y",
-        "-i", video_path,
-        "-ss", str(audio_offset),
-        "-i", audio_path,
-        "-filter_complex",
-        f"[1:a]volume={music_volume}[music];[0:a]volume=1.0[veo];[veo][music]amix=inputs=2:duration=shortest",
-        "-c:v", "copy",
-        "-movflags", "+faststart",
-        output_path,
-    ]
-
-    # Fallback if video has no audio track — simpler merge
-    cmd_no_video_audio = [
         "ffmpeg", "-y",
         "-i", video_path,
         "-ss", str(audio_offset),
@@ -52,18 +39,14 @@ def merge_audio_video(
         "-c:v", "copy",
         "-c:a", "aac",
         "-b:a", "192k",
+        "-map", "0:v:0",
+        "-map", "1:a:0",
         "-shortest",
         "-movflags", "+faststart",
         output_path,
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-
-    if result.returncode != 0:
-        # Likely failed because video has no audio stream — retry with simple merge
-        if "does not contain any stream" in result.stderr or "Stream map" in result.stderr:
-            print("[Composer] Video has no audio track, using simple merge...")
-            result = subprocess.run(cmd_no_video_audio, capture_output=True, text=True, timeout=60)
 
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {result.stderr}")
