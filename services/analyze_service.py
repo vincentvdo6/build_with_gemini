@@ -26,7 +26,7 @@ Return a JSON object with this exact structure:
       "campaign_tone": "3-4 words",
       "prompt_fragments": {
         "nano_banana": "Detailed image generation prompt for this direction — include lighting, composition, setting, props, mood, and the product in context",
-        "veo": "Video scene description — camera movement, pacing, setting, action, mood. 8 seconds of story. MUST include an exact visual description of the product (color, shape, packaging type, brand name, label details) so the video model renders the correct product without reference images.",
+        "veo": "Video prompt following ALL rules below. MUST include an exact visual description of the product (color, shape, packaging type, brand name, label details).",
         "lyria": "Music genre, BPM, specific instruments, mood, energy level"
       }
     }
@@ -52,6 +52,33 @@ The veo prompt fragment and lyria prompt fragment must have MATCHING PACING:
 - If the video is medium energy (steady movement, reveal shots), the music must be mid BPM (95-115), rhythmic but not aggressive
 - If the video is high energy (quick cuts, fast motion, dynamic camera), the music must be high BPM (115-140), driving and intense
 State the pacing category explicitly in both the veo and lyria prompts so they align. A slow cinematic pan with 140 BPM punk rock is a failure. A fast-cut montage with 70 BPM ambient is a failure.
+
+## VEO VIDEO PROMPT RULES — every veo_prompt_fragment MUST follow ALL of these:
+
+PHYSICAL INTERACTIONS: Avoid close-up hand-object interaction mid-action (grabbing, opening, peeling, pouring, cracking tabs). Show hands ALREADY holding the product, or the before/after of an action. Use wide/medium shots when people are present. Product being set down on a surface is safe.
+
+HUMAN PRESENCE: People in the scene ARE encouraged (skateboarding, walking, working, exercising, socializing in background). Keep the camera FOCUSED on the product with people as environmental context, not actors performing precise physical tasks with the product.
+
+PACING: This is social media content (TikTok, Reels, YouTube Shorts). Every prompt must use fast, dynamic energy: "fast-paced", "quick cuts", "dynamic camera movement". NEVER use "slow pan", "slow motion", or "gentle movement". Include specific timing cues within the 8-second window.
+
+8-SECOND STRUCTURE: Every video must follow this arc:
+- Seconds 0-2: HOOK — dramatic angle, fast movement, attention grab
+- Seconds 3-5: HERO — product front and center, branding visible
+- Seconds 6-8: CLOSE — energy exit (zoom, whip pan, dynamic outro)
+
+CAMERA TECHNIQUES: Use rapid dolly zooms, push-ins, whip pans between angles, dynamic tracking shots, light/shadow transitions, environmental particles (water spray, sparks, dust, confetti) that exist in the scene but don't physically interact with the product. AVOID extreme close-ups and awkward or unnatural zoom-ins on the product.
+
+PRODUCT VISIBILITY: The product's front branding and logo must be clearly visible during the hero shot (seconds 3-5). Never show the back or nutrition facts as the primary face.
+
+ANTI-AI REALISM: Every veo_prompt_fragment must include:
+- A specific camera/lens reference: "shot on 35mm", "85mm lens", "anamorphic widescreen", "handheld DSLR"
+- At least one physical imperfection: "slight film grain", "subtle lens flare", "minor focus breathing", "dust particles in the light", "micro handheld jitter"
+- Material/texture cues for objects in the scene: "wet concrete", "brushed aluminum", "weathered wood grain", "frosted glass"
+- NEVER use: "hyper-realistic", "8K", "ultra HD", "perfect"
+
+NEGATIVE CUES: Append to every veo_prompt_fragment: "Avoid: motion blur, face distortion, warping, morphing, duplicate objects, floating objects, plastic skin, oversaturation, over-sharpening"
+
+AUDIO DIRECTION: Specify audio separately at the end of the veo prompt: "Audio: [ambient sounds relevant to the scene, product-specific sounds like clinks/crunches/pours, environmental noise]". Veo generates synchronized audio natively — guide it or it guesses randomly.
 
 ## Additional rules:
 - Extract dominant colors from the actual product image, not guessed

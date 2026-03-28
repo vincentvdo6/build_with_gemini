@@ -56,19 +56,23 @@ def run_campaign(
     print(f"\n  → Using art direction: '{chosen.get('name', 'Direction 1')}'")
     print(f"  {rate_limiter.status()}\n")
 
-    # Step 2: Generate preview image
-    print("Step 2/5: Generating preview image...")
-    preview_bytes = apply_art_direction(
-        isolated_product=product_photos[0],
-        art_direction=chosen,
-        reference_images=product_photos,
-        logo=logo,
-    )
-    preview_path = os.path.join(out_dir, "preview.png")
-    Path(preview_path).write_bytes(preview_bytes)
-    print(f"  Saved: {preview_path} ({len(preview_bytes) / 1024:.0f} KB)")
-    print(f"  {rate_limiter.status()}\n")
-    assets["preview"] = preview_path
+    # Step 2: Generate 5 campaign images for the chosen art direction
+    print(f"Step 2/5: Generating 5 images for '{chosen.get('name', 'Direction 1')}'...")
+    assets["images"] = []
+
+    for img_num in range(1, 6):
+        print(f"  Generating image {img_num}/5...")
+        img_bytes = apply_art_direction(
+            isolated_product=product_photos[0],
+            art_direction=chosen,
+            reference_images=product_photos,
+            logo=logo,
+        )
+        img_path = os.path.join(out_dir, f"image_{img_num}.png")
+        Path(img_path).write_bytes(img_bytes)
+        print(f"    Saved: {img_path} ({len(img_bytes) / 1024:.0f} KB)")
+        print(f"    {rate_limiter.status()}")
+        assets["images"].append(img_path)
 
     # Step 3: Generate video
     print("Step 3/5: Generating video (this takes ~60s)...")
@@ -119,12 +123,18 @@ def run_campaign(
     print(f"  {rate_limiter.status()}")
     print(f"{'='*60}")
     print(f"\n  Output directory: {out_dir}/")
-    for name, path in assets.items():
-        size = os.path.getsize(path)
-        if size > 1024 * 1024:
-            print(f"    {name}: {path} ({size / (1024*1024):.1f} MB)")
+    for name, value in assets.items():
+        if isinstance(value, list):
+            print(f"    {name}: {len(value)} files")
+            for p in value:
+                size = os.path.getsize(p)
+                print(f"      {p} ({size / 1024:.0f} KB)")
         else:
-            print(f"    {name}: {path} ({size / 1024:.0f} KB)")
+            size = os.path.getsize(value)
+            if size > 1024 * 1024:
+                print(f"    {name}: {value} ({size / (1024*1024):.1f} MB)")
+            else:
+                print(f"    {name}: {value} ({size / 1024:.0f} KB)")
 
     return assets
 

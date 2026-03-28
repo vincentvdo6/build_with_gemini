@@ -3,6 +3,7 @@ node_modules/
 .env
 .env.local
 serviceAccount.json
+buildwithgemini-*.json
 outputs/
 __pycache__/
 *.pyc
