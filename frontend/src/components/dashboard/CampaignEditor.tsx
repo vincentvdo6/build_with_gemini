@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import SocialMediaPreview from "./SocialMediaPreview";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ export default function CampaignEditor({
   const [errorText, setErrorText] = useState("");
   const [campaignData, setCampaignData] = useState<CampaignData | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const hasStarted = useRef(false);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -149,7 +151,6 @@ export default function CampaignEditor({
     });
 
     es.addEventListener("error", (e: any) => {
-      // SSE error event from server (custom)
       if (e.data) {
         try {
           const data = JSON.parse(e.data);
@@ -161,7 +162,6 @@ export default function CampaignEditor({
         es.close();
         eventSourceRef.current = null;
       }
-      // Browser-level reconnect errors are handled by EventSource automatically
     });
 
     return es;
@@ -176,10 +176,8 @@ export default function CampaignEditor({
       setPhase("generating");
       setStatusText("Starting campaign generation...");
 
-      // 1. Connect SSE first so we don't miss events
       connectSSE();
 
-      // 2. Build FormData and POST to trigger generation
       const formData = new FormData();
       files.forEach((file) => {
         formData.append("product_photos", file);
@@ -211,8 +209,6 @@ export default function CampaignEditor({
           throw new Error(msg);
         }
       } catch (err: any) {
-        // If the POST itself fails, show error but keep SSE open in case
-        // the server processes it anyway (e.g., request was received)
         if (err.name === "TypeError" && err.message.includes("fetch")) {
           setErrorText(
             "Cannot connect to server. Make sure the backend is running on port 3001."
@@ -243,11 +239,10 @@ export default function CampaignEditor({
     };
   }, [campaignId, files, logo, directionIndex, imageCount, connectSSE]);
 
-  // Derive image URLs from campaign data
+  // Derive URLs from campaign data
   const imageUrls: string[] = [];
   if (campaignData?.images) {
     campaignData.images.forEach((img) => {
-      // If the image path is relative, prepend the API base
       if (img.startsWith("http")) {
         imageUrls.push(img);
       } else {
@@ -284,11 +279,10 @@ export default function CampaignEditor({
         flexDirection: "column",
       }}
     >
-      {/* Spinner keyframe animation */}
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          to   { transform: rotate(360deg); }
         }
       `}</style>
 
@@ -329,6 +323,7 @@ export default function CampaignEditor({
         >
           <BackArrowIcon />
         </button>
+
         <h1
           style={{
             fontSize: "16px",
@@ -341,42 +336,59 @@ export default function CampaignEditor({
         >
           {campaignName}
         </h1>
-        {phase === "generating" && (
-          <span
-            style={{
-              fontSize: "12px",
-              color: "#3b82f6",
-              fontWeight: 500,
-              marginLeft: "auto",
-            }}
-          >
-            Generating...
-          </span>
-        )}
-        {phase === "complete" && (
-          <span
-            style={{
-              fontSize: "12px",
-              color: "#22c55e",
-              fontWeight: 500,
-              marginLeft: "auto",
-            }}
-          >
-            Complete
-          </span>
-        )}
-        {phase === "error" && (
-          <span
-            style={{
-              fontSize: "12px",
-              color: "#ef4444",
-              fontWeight: 500,
-              marginLeft: "auto",
-            }}
-          >
-            Error
-          </span>
-        )}
+
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+          {phase === "generating" && (
+            <span style={{ fontSize: "12px", color: "#3b82f6", fontWeight: 500 }}>
+              Generating...
+            </span>
+          )}
+          {phase === "complete" && (
+            <>
+              <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 500 }}>
+                Complete
+              </span>
+              <button
+                onClick={() => setPreviewOpen(true)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "none",
+                  color: "rgba(255,255,255,0.7)",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "color 0.2s, border-color 0.2s, background-color 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "#ffffff";
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
+                  e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                Preview
+              </button>
+            </>
+          )}
+          {phase === "error" && (
+            <span style={{ fontSize: "12px", color: "#ef4444", fontWeight: 500 }}>
+              Error
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Center Content ── */}
@@ -386,42 +398,21 @@ export default function CampaignEditor({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent:
-            phase === "generating" || phase === "idle" ? "center" : "flex-start",
+          justifyContent: phase === "generating" || phase === "idle" ? "center" : "flex-start",
           overflow: "auto",
           padding: "32px 24px",
         }}
       >
-        {/* ── Generating / Idle State ── */}
+        {/* Generating / Idle */}
         {(phase === "generating" || phase === "idle") && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "24px",
-            }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "24px" }}>
             <SpinnerIcon size={64} />
             <div style={{ textAlign: "center" }}>
-              <p
-                style={{
-                  fontSize: "18px",
-                  fontWeight: 600,
-                  margin: "0 0 8px 0",
-                  color: "#ffffff",
-                }}
-              >
+              <p style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 8px 0", color: "#ffffff" }}>
                 {statusText}
               </p>
               {progressText && (
-                <p
-                  style={{
-                    fontSize: "14px",
-                    color: "rgba(255,255,255,0.5)",
-                    margin: 0,
-                  }}
-                >
+                <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)", margin: 0 }}>
                   {progressText}
                 </p>
               )}
@@ -429,242 +420,87 @@ export default function CampaignEditor({
           </div>
         )}
 
-        {/* ── Error State ── */}
+        {/* Error */}
         {phase === "error" && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              maxWidth: "480px",
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                backgroundColor: "rgba(239,68,68,0.1)",
-                border: "2px solid rgba(239,68,68,0.3)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "28px",
-              }}
-            >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", maxWidth: "480px", textAlign: "center" }}>
+            <div style={{ width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "rgba(239,68,68,0.1)", border: "2px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px" }}>
               !
             </div>
-            <p
-              style={{
-                fontSize: "18px",
-                fontWeight: 600,
-                margin: 0,
-                color: "#ef4444",
-              }}
-            >
+            <p style={{ fontSize: "18px", fontWeight: 600, margin: 0, color: "#ef4444" }}>
               Generation Failed
             </p>
-            <p
-              style={{
-                fontSize: "14px",
-                color: "rgba(255,255,255,0.5)",
-                margin: 0,
-                lineHeight: "1.5",
-              }}
-            >
+            <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: "1.5" }}>
               {errorText}
             </p>
             <button
               onClick={onBack}
-              style={{
-                marginTop: "8px",
-                padding: "10px 24px",
-                borderRadius: "10px",
-                border: "1px solid rgba(255,255,255,0.2)",
-                backgroundColor: "transparent",
-                color: "#ffffff",
-                fontSize: "14px",
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "border-color 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-              }}
+              style={{ marginTop: "8px", padding: "10px 24px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "transparent", color: "#ffffff", fontSize: "14px", fontWeight: 500, cursor: "pointer" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
             >
               Back to Campaigns
             </button>
           </div>
         )}
 
-        {/* ── Complete State ── */}
+        {/* Complete */}
         {phase === "complete" && campaignData && (
           <div style={{ width: "100%", maxWidth: "960px" }}>
+
             {/* Generated Images */}
             {imageUrls.length > 0 && (
               <section style={{ marginBottom: "48px" }}>
-                <h2
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: "rgba(255,255,255,0.4)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    marginBottom: "16px",
-                  }}
-                >
+                <h2 style={{ fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>
                   Generated Images
                 </h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: "12px",
-                  }}
-                >
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
                   {imageUrls.map((url, i) => (
                     <div
                       key={i}
-                      style={{
-                        aspectRatio: "1 / 1",
-                        borderRadius: "12px",
-                        overflow: "hidden",
-                        border: "1px solid rgba(255,255,255,0.07)",
-                        backgroundColor: "rgba(255,255,255,0.02)",
-                        cursor: "pointer",
-                        transition: "border-color 0.2s",
-                      }}
+                      style={{ aspectRatio: "1 / 1", borderRadius: "12px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.02)", cursor: "pointer" }}
                       onClick={() => setZoomedImage(url)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor =
-                          "rgba(59,130,246,0.4)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor =
-                          "rgba(255,255,255,0.07)";
-                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(59,130,246,0.4)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
                     >
-                      <img
-                        src={url}
-                        alt={`Generated ad image ${i + 1}`}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                      />
+                      <img src={url} alt={`Generated ad image ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     </div>
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Video Player */}
+            {/* Video */}
             {videoUrl && (
               <section style={{ marginBottom: "48px" }}>
-                <h2
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: "rgba(255,255,255,0.4)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    marginBottom: "16px",
-                  }}
-                >
+                <h2 style={{ fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>
                   Video Ad
                 </h2>
-                <div
-                  style={{
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                    backgroundColor: "#000000",
-                  }}
-                >
-                  <video
-                    src={videoUrl}
-                    controls
-                    style={{
-                      width: "100%",
-                      maxHeight: "480px",
-                      display: "block",
-                    }}
-                  />
+                <div style={{ borderRadius: "12px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)", backgroundColor: "#000000" }}>
+                  <video src={videoUrl} controls style={{ width: "100%", maxHeight: "480px", display: "block" }} />
                 </div>
               </section>
             )}
 
-            {/* Jingle / Audio Player */}
+            {/* Jingle */}
             {jingleUrl && (
               <section style={{ marginBottom: "48px" }}>
-                <h2
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: "rgba(255,255,255,0.4)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    marginBottom: "16px",
-                  }}
-                >
+                <h2 style={{ fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>
                   Campaign Jingle
                 </h2>
-                <div
-                  style={{
-                    borderRadius: "12px",
-                    padding: "20px",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                    backgroundColor: "rgba(255,255,255,0.02)",
-                  }}
-                >
-                  <audio
-                    src={jingleUrl}
-                    controls
-                    style={{ width: "100%", display: "block" }}
-                  />
+                <div style={{ borderRadius: "12px", padding: "20px", border: "1px solid rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.02)" }}>
+                  <audio src={jingleUrl} controls style={{ width: "100%", display: "block" }} />
                 </div>
               </section>
             )}
 
-            {/* Final Composed Video */}
+            {/* Final Video */}
             {finalVideoUrl && (
               <section style={{ marginBottom: "48px" }}>
-                <h2
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: "rgba(255,255,255,0.4)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    marginBottom: "16px",
-                  }}
-                >
+                <h2 style={{ fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>
                   Final Ad
                 </h2>
-                <div
-                  style={{
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                    border: "2px solid rgba(59,130,246,0.3)",
-                    backgroundColor: "#000000",
-                  }}
-                >
-                  <video
-                    src={finalVideoUrl}
-                    controls
-                    style={{
-                      width: "100%",
-                      maxHeight: "480px",
-                      display: "block",
-                    }}
-                  />
+                <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid rgba(59,130,246,0.3)", backgroundColor: "#000000" }}>
+                  <video src={finalVideoUrl} controls style={{ width: "100%", maxHeight: "480px", display: "block" }} />
                 </div>
               </section>
             )}
@@ -672,59 +508,34 @@ export default function CampaignEditor({
         )}
       </div>
 
+      {/* ── Social Media Preview ── */}
+      <SocialMediaPreview
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        campaignName={campaignName}
+        subtitle={campaignData?.name || campaignName}
+        images={imageUrls.map((url, i) => ({ id: String(i), label: `Image ${i + 1}`, previewUrl: url }))}
+        videoUrl={videoUrl || undefined}
+        audioUrl={jingleUrl || undefined}
+      />
+
       {/* ── Lightbox ── */}
       {zoomedImage && (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            backgroundColor: "rgba(0,0,0,0.85)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-          }}
+          style={{ position: "fixed", inset: 0, zIndex: 50, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
           onClick={() => setZoomedImage(null)}
         >
           <img
             src={zoomedImage}
             alt="Zoomed view"
-            style={{
-              maxWidth: "90vw",
-              maxHeight: "90vh",
-              borderRadius: "12px",
-              objectFit: "contain",
-              boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-            }}
+            style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: "12px", objectFit: "contain", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}
             onClick={(e) => e.stopPropagation()}
           />
           <button
             onClick={() => setZoomedImage(null)}
-            style={{
-              position: "absolute",
-              top: "24px",
-              right: "24px",
-              width: "40px",
-              height: "40px",
-              borderRadius: "50%",
-              backgroundColor: "rgba(255,255,255,0.1)",
-              border: "none",
-              color: "#ffffff",
-              fontSize: "20px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background-color 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.2)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)";
-            }}
+            style={{ position: "absolute", top: "24px", right: "24px", width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.1)", border: "none", color: "#ffffff", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
             aria-label="Close lightbox"
           >
             &#x2715;
