@@ -82,9 +82,9 @@ function CampaignCard({ campaign, onCardClick, onDelete, onRename }: { campaign:
 
   return (
     <div className="relative group">
-      <button
-        onClick={() => onCardClick(campaign.name)}
-        className="group/card flex flex-col rounded-2xl border border-white/[0.07] hover:border-blue-400/30 transition-all duration-200 text-left w-full"
+      <div
+        onClick={() => !renaming && onCardClick(campaign.name)}
+        className="group/card flex flex-col rounded-2xl border border-white/[0.07] hover:border-blue-400/30 transition-all duration-200 cursor-pointer"
         style={{ background: "rgba(255,255,255,0.02)" }}
       >
         <div className={`relative w-full h-44 flex items-center justify-center rounded-t-2xl ${campaign.previewBg}`}>
@@ -174,7 +174,7 @@ function CampaignCard({ campaign, onCardClick, onDelete, onRename }: { campaign:
           <p className="text-sm text-white/40 mb-1">{campaign.assets}</p>
           <p className="text-xs text-white/25">{campaign.timeAgo}</p>
         </div>
-      </button>
+      </div>
     </div>
   );
 }
