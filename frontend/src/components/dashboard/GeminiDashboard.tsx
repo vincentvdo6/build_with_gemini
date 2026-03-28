@@ -1,24 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
-// ─── Gemini 4-pointed star ────────────────────────────────────────────────────
-
-function GeminiStar({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Top lobe – blue */}
-      <path d="M16 2 C15.2 8 15.2 12 16 16 C16.8 12 16.8 8 16 2Z" fill="#4285F4" />
-      {/* Right lobe – red */}
-      <path d="M30 16 C24 15.2 20 15.2 16 16 C20 16.8 24 16.8 30 16Z" fill="#EA4335" />
-      {/* Bottom lobe – yellow */}
-      <path d="M16 30 C16.8 24 16.8 20 16 16 C15.2 20 15.2 24 16 30Z" fill="#FBBC04" />
-      {/* Left lobe – green */}
-      <path d="M2 16 C8 16.8 12 16.8 16 16 C12 15.2 8 15.2 2 16Z" fill="#34A853" />
-    </svg>
-  );
-}
-
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
 function MenuIcon() {
@@ -40,31 +21,6 @@ function SearchIcon() {
   );
 }
 
-function PencilIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  );
-}
-
 function GearIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -74,211 +30,183 @@ function GearIcon() {
   );
 }
 
-function PlusIcon() {
+function NewChatIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
   );
 }
 
-function ToolsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="6" height="6" rx="1" />
-      <rect x="9" y="3" width="6" height="6" rx="1" />
-      <rect x="16" y="3" width="6" height="6" rx="1" />
-      <rect x="2" y="10" width="6" height="6" rx="1" />
-      <rect x="9" y="10" width="6" height="6" rx="1" />
-      <rect x="16" y="10" width="6" height="6" rx="1" />
-    </svg>
-  );
-}
+// ─── Account avatar button ────────────────────────────────────────────────────
 
-function DiamondIcon() {
+function AccountButton({ userName }: { userName: string }) {
+  const initials = userName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 22 12 12 22 2 12" />
-    </svg>
+    <button
+      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-white hover:opacity-90 transition-opacity focus:outline-none"
+      style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
+      aria-label={`Account: ${userName}`}
+    >
+      {initials}
+    </button>
   );
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-function Sidebar() {
-  const [gemsOpen, setGemsOpen] = useState(true);
+const RECENT_CAMPAIGNS = [
+  "Sunrise Coffee",
+  "NovaTech Earbuds",
+  "Green Garden Skincare",
+  "Q3 awareness — video",
+];
 
+function Sidebar() {
   return (
     <aside
-      className="flex flex-col h-screen w-[280px] flex-shrink-0 px-3 py-4"
-      style={{ backgroundColor: "#131314" }}
+      className="flex flex-col h-screen w-[260px] flex-shrink-0 border-r border-white/[0.07]"
+      style={{ backgroundColor: "#0f0f13" }}
     >
-      {/* Top row */}
-      <div className="flex items-center justify-between px-2 mb-6">
-        <button
-          className="p-2 rounded-full text-[#9aa0a6] hover:bg-white/10 transition-colors"
-          aria-label="Menu"
-        >
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-3 py-3">
+        <button className="p-2 rounded-full text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors" aria-label="Toggle sidebar">
           <MenuIcon />
         </button>
-        <button
-          className="p-2 rounded-full text-[#9aa0a6] hover:bg-white/10 transition-colors"
-          aria-label="Search"
-        >
+        <button className="p-2 rounded-full text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors" aria-label="Search">
           <SearchIcon />
         </button>
       </div>
 
-      {/* Nav links */}
-      <nav className="flex flex-col gap-0.5">
-        <button className="flex items-center gap-3 px-3 py-2.5 rounded-full text-sm text-[#e3e3e3] hover:bg-white/10 transition-colors text-left">
-          <PencilIcon />
-          New chat
+      {/* New campaign */}
+      <div className="px-3 pb-1">
+        <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors text-left">
+          <NewChatIcon />
+          New campaign
         </button>
-        <button className="flex items-center gap-3 px-3 py-2.5 rounded-full text-sm text-[#e3e3e3] hover:bg-white/10 transition-colors text-left">
-          <HeartIcon />
-          My stuff
-        </button>
-      </nav>
-
-      {/* Gems section */}
-      <div className="mt-5">
-        <button
-          onClick={() => setGemsOpen((v) => !v)}
-          className="flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm font-medium text-[#e3e3e3] hover:bg-white/10 transition-colors"
-        >
-          <span>Gems</span>
-          <span
-            className="text-[#9aa0a6] transition-transform duration-200"
-            style={{ transform: gemsOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-          >
-            <ChevronRightIcon />
-          </span>
-        </button>
-
-        {gemsOpen && (
-          <div className="mt-0.5 flex flex-col gap-0.5">
-            <button className="flex items-center gap-3 px-3 py-2.5 rounded-full text-sm text-[#9aa0a6] hover:bg-white/10 transition-colors text-left">
-              <DiamondIcon />
-              physicsgoat
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Your files */}
+      <div className="px-3 pb-2">
+        <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors text-left">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+          Your files
+        </button>
+      </div>
+
+      {/* Your campaigns */}
+      <div className="flex-1 overflow-y-auto px-3 pb-2">
+        <p className="text-[11px] font-semibold text-white/30 uppercase tracking-widest px-2 mb-1">Your campaigns</p>
+        <nav className="flex flex-col gap-0.5">
+          {RECENT_CAMPAIGNS.map((campaign) => (
+            <button key={campaign} className="flex items-center px-3 py-2 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors text-left truncate w-full">
+              {campaign}
+            </button>
+          ))}
+        </nav>
+      </div>
 
       {/* Bottom */}
-      <div className="flex flex-col gap-1.5 pb-2">
-        <button className="flex items-center gap-3 px-3 py-2.5 rounded-full text-sm text-[#9aa0a6] hover:bg-white/10 transition-colors text-left">
+      <div className="px-3 pb-3 pt-2 border-t border-white/[0.05]">
+        <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-white/80 hover:bg-white/5 transition-colors text-left">
           <GearIcon />
           Settings &amp; help
-        </button>
-
-        <button
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium text-white transition-colors"
-          style={{ backgroundColor: "#1a73e8" }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1557b0")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1a73e8")}
-        >
-          <GeminiStar className="w-4 h-4" />
-          Upgrade
         </button>
       </div>
     </aside>
   );
 }
 
-// ─── Chat input ───────────────────────────────────────────────────────────────
+// ─── Campaign card ────────────────────────────────────────────────────────────
 
-function ChatInput() {
-  const [value, setValue] = useState("");
+type CampaignStatus = "complete" | "generating" | "draft";
 
+interface Campaign {
+  id: string;
+  name: string;
+  assets: string;
+  timeAgo: string;
+  status: CampaignStatus;
+  /** tailwind bg class for the preview area */
+  previewBg: string;
+  /** tailwind bg class for the preview thumbnail shape */
+  thumbBg: string;
+  thumbShape: "rect" | "circle";
+}
+
+const STATUS_STYLES: Record<CampaignStatus, { label: string; className: string }> = {
+  complete:   { label: "Complete",     className: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" },
+  generating: { label: "Generating…",  className: "bg-amber-500/20  text-amber-400  border border-amber-500/30"  },
+  draft:      { label: "Draft",        className: "bg-white/10       text-white/50   border border-white/10"       },
+};
+
+const CAMPAIGNS: Campaign[] = [
+  { id: "1", name: "Sunrise Coffee",       assets: "3 images · 1 video · 1 jingle", timeAgo: "2 hours ago",  status: "complete",   previewBg: "bg-[#2a1a08]", thumbBg: "bg-[#c17f3a]",  thumbShape: "rect"   },
+  { id: "2", name: "NovaTech Earbuds",     assets: "2 images · 1 video · 1 jingle", timeAgo: "5 hours ago",  status: "complete",   previewBg: "bg-[#0a0f1e]", thumbBg: "bg-[#2d4a8a]",  thumbShape: "circle" },
+  { id: "3", name: "Green Garden Skincare",assets: "3 images · video pending",       timeAgo: "Just now",     status: "generating", previewBg: "bg-[#0d1f12]", thumbBg: "bg-[#2d5c3a]",  thumbShape: "rect"   },
+];
+
+function CampaignCard({ campaign }: { campaign: Campaign }) {
+  const status = STATUS_STYLES[campaign.status];
   return (
-    <div
-      className="w-full max-w-[720px] rounded-2xl px-4 pt-4 pb-3"
-      style={{ backgroundColor: "#1e2124" }}
+    <button
+      className="group flex flex-col rounded-2xl overflow-hidden border border-white/[0.07] hover:border-violet-400/30 transition-all duration-200 text-left w-full"
+      style={{ background: "rgba(255,255,255,0.02)" }}
     >
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Ask Gemini 3"
-        rows={1}
-        className="w-full bg-transparent text-[#e3e3e3] placeholder-[#9aa0a6] text-base resize-none outline-none leading-relaxed"
-        style={{ minHeight: "28px", maxHeight: "200px" }}
-        onInput={(e) => {
-          const el = e.currentTarget;
-          el.style.height = "auto";
-          el.style.height = `${el.scrollHeight}px`;
-        }}
-      />
-
-      <div className="flex items-center justify-between mt-3">
-        <div className="flex items-center gap-3">
-          <button
-            className="p-1.5 rounded-full text-[#9aa0a6] hover:bg-white/10 transition-colors"
-            aria-label="Attach"
-          >
-            <PlusIcon />
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-[#9aa0a6] hover:bg-white/10 transition-colors">
-            <ToolsIcon />
-            Tools
-          </button>
-        </div>
-
-        <button
-          disabled={!value.trim()}
-          className="p-2 rounded-full transition-colors disabled:opacity-30"
-          style={{ backgroundColor: value.trim() ? "#3c3f41" : "transparent" }}
-          aria-label="Send"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#e3e3e3] rotate-90">
-            <line x1="12" y1="19" x2="12" y2="5" />
-            <polyline points="5 12 12 5 19 12" />
-          </svg>
-        </button>
+      {/* Preview area */}
+      <div className={`relative w-full h-44 flex items-center justify-center ${campaign.previewBg}`}>
+        {/* Status badge */}
+        <span className={`absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-full ${status.className}`}>
+          {status.label}
+        </span>
+        {/* Thumbnail shape */}
+        {campaign.thumbShape === "rect" ? (
+          <div className={`w-20 h-24 rounded-xl ${campaign.thumbBg}`} />
+        ) : (
+          <div className={`w-20 h-20 rounded-full ${campaign.thumbBg}`} />
+        )}
       </div>
-    </div>
+
+      {/* Info */}
+      <div className="px-4 py-4">
+        <p className="text-base font-bold text-white mb-1 group-hover:text-violet-300 transition-colors">{campaign.name}</p>
+        <p className="text-sm text-white/40 mb-1">{campaign.assets}</p>
+        <p className="text-xs text-white/25">{campaign.timeAgo}</p>
+      </div>
+    </button>
   );
 }
 
 // ─── Main content ─────────────────────────────────────────────────────────────
 
-function MainContent() {
+function MainContent({ userName }: { userName: string }) {
   return (
-    <main className="flex-1 flex flex-col h-screen overflow-hidden" style={{ backgroundColor: "#131314" }}>
-      {/* Top-right toolbar */}
-      <div className="flex items-center justify-end gap-3 px-6 py-4">
-        <button
-          className="px-3 py-1 rounded-md text-xs font-semibold text-[#9aa0a6] border border-[#3c3f41] hover:bg-white/5 transition-colors"
-          aria-label="PRO"
-        >
-          PRO
-        </button>
-        <button
-          className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-white"
-          style={{ backgroundColor: "#1a73e8" }}
-          aria-label="User profile"
-        >
-          P
-        </button>
+    <main className="flex-1 flex flex-col h-screen overflow-hidden" style={{ backgroundColor: "#0f0f13" }}>
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.05] flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-xl font-bold text-white tracking-tight">AdCraft</span>
+          <span className="px-3 py-1 rounded-lg text-sm font-medium text-white/60 bg-white/5">Dashboard</span>
+        </div>
+        <AccountButton userName={userName} />
       </div>
 
-      {/* Centered greeting + input */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16">
-        <div className="flex items-center gap-3 mb-2">
-          <GeminiStar className="w-8 h-8" />
-          <span className="text-2xl font-normal text-[#e3e3e3]">Hi Phillip</span>
+      {/* Campaign grid */}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {CAMPAIGNS.map((c) => (
+            <CampaignCard key={c.id} campaign={c} />
+          ))}
         </div>
-
-        <h1 className="text-[2.4rem] font-semibold text-[#e3e3e3] mb-10 leading-tight">
-          Where should we start?
-        </h1>
-
-        <ChatInput />
       </div>
     </main>
   );
@@ -286,15 +214,15 @@ function MainContent() {
 
 // ─── Root dashboard ───────────────────────────────────────────────────────────
 
-export default function GeminiDashboard() {
+interface GeminiDashboardProps {
+  userName?: string;
+}
+
+export default function GeminiDashboard({ userName = "User" }: GeminiDashboardProps) {
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "#131314" }}>
+    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "#0f0f13" }}>
       <Sidebar />
-
-      {/* Divider */}
-      <div className="w-px flex-shrink-0" style={{ backgroundColor: "#2d2f31" }} />
-
-      <MainContent />
+      <MainContent userName={userName} />
     </div>
   );
 }
