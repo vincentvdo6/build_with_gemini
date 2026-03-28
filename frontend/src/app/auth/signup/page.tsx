@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SignupForm } from "@/components/auth/SignupForm";
+import { SignUpForm } from "@/components/auth/SignUpForm";
 
 export const metadata: Metadata = {
-  title: "Sign up — AdCraft",
-  description: "Create your AdCraft account to generate AI-powered ad campaigns.",
+  title: "Create account — AdCraft",
+  description: "Create your AdCraft account and start generating AI-powered ad campaigns.",
 };
-
-// ─── Decorative background blobs (pure CSS, no JS) ──────────────────────────
 
 function BackgroundBlobs() {
   return (
@@ -37,8 +35,6 @@ function BackgroundBlobs() {
   );
 }
 
-// ─── Brand mark ──────────────────────────────────────────────────────────────
-
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5 group">
@@ -52,8 +48,6 @@ function Logo() {
     </Link>
   );
 }
-
-// ─── Trust badges strip ───────────────────────────────────────────────────────
 
 function TrustBadges() {
   return (
@@ -72,14 +66,12 @@ function TrustBadges() {
   );
 }
 
-// ─── Auth flow step indicator ─────────────────────────────────────────────────
-
 function StepBreadcrumb() {
   const steps = [
-    { label: "Sign up", href: null, active: true },
-    { label: "Verify email", href: null, done: false },
-    { label: "Sign in", href: "/auth/login", done: false },
-    { label: "Profile setup", href: null, done: false },
+    { label: "Sign up", active: true },
+    { label: "Verify email", done: false },
+    { label: "Sign in", done: false },
+    { label: "Profile setup", done: false },
   ];
 
   return (
@@ -87,20 +79,13 @@ function StepBreadcrumb() {
       {steps.map((step, i) => (
         <div key={step.label} className="flex items-center gap-1.5">
           {i > 0 && (
-            <div
-              className={[
-                "h-px w-5 transition-colors",
-                step.done ? "bg-violet-400/60" : "bg-white/10",
-              ].join(" ")}
-            />
+            <div className="h-px w-5 bg-white/10" />
           )}
           <span
             className={[
               "text-[11px] font-medium px-2 py-0.5 rounded-full transition-colors",
               step.active
                 ? "bg-violet-600/40 text-violet-300 ring-1 ring-violet-400/40"
-                : step.done
-                ? "text-violet-400/70"
                 : "text-white/20",
             ].join(" ")}
           >
@@ -112,16 +97,13 @@ function StepBreadcrumb() {
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
-
-export default function SignupPage() {
+export default function SignUpPage() {
   return (
     <>
       <BackgroundBlobs />
 
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
 
-        {/* Top nav strip */}
         <header className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-5">
           <Logo />
           <p className="text-sm text-white/40">
@@ -135,14 +117,12 @@ export default function SignupPage() {
           </p>
         </header>
 
-        {/* Card */}
         <main className="w-full max-w-md">
 
           <div className="mb-6 flex justify-center">
             <StepBreadcrumb />
           </div>
 
-          {/* Glass card */}
           <div
             className="rounded-2xl border border-white/[0.07] p-8 backdrop-blur-xl"
             style={{
@@ -155,11 +135,11 @@ export default function SignupPage() {
                 Create your account
               </h1>
               <p className="mt-1.5 text-sm text-white/40">
-                Get started building AI-powered ad campaigns
+                Start generating AI-powered ad campaigns in minutes
               </p>
             </div>
 
-            <SignupForm />
+            <SignUpForm />
           </div>
 
           <div className="mt-8">
