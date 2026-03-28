@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import NewCampaignModal from "./NewCampaignModal";
+import ConceptDirectionScreen from "./ConceptDirectionScreen";
 import CampaignEditor from "./CampaignEditor";
 
 // ─── Account avatar button ────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [showNewCampaign, setShowNewCampaign] = useState(false);
+  const [pendingCampaign, setPendingCampaign] = useState<{ businessName: string; productName: string } | null>(null);
   const [editorCampaign, setEditorCampaign] = useState<string | null>(null);
 
   // If an editor is open, render it full-screen instead of the dashboard
@@ -211,10 +213,20 @@ export default function GeminiDashboard({ userName = "User" }: GeminiDashboardPr
       {showNewCampaign && (
         <NewCampaignModal
           onClose={() => setShowNewCampaign(false)}
-          onGenerate={({ businessName }) => {
+          onGenerate={({ businessName, productName }) => {
             setShowNewCampaign(false);
-            setEditorCampaign(businessName || "New Campaign");
+            setPendingCampaign({ businessName, productName });
           }}
+        />
+      )}
+
+      {/* Concept Direction Screen */}
+      {pendingCampaign && (
+        <ConceptDirectionScreen
+          businessName={pendingCampaign.businessName}
+          productName={pendingCampaign.productName}
+          onBack={() => { setPendingCampaign(null); setShowNewCampaign(true); }}
+          onGenerate={() => { setEditorCampaign(pendingCampaign.businessName || "New Campaign"); setPendingCampaign(null); }}
         />
       )}
     </div>
